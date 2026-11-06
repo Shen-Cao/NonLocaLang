@@ -25,3 +25,18 @@ __pycache__/
 *.synctex.gz
 *.toc
 *.pdf
+
+# Python packaging, coverage, and environments
+*.egg-info/
+/dist/
+.venv/
+.coverage
+htmlcov/
+*.egg
+
+# Additional generated report files
+*.nav
+*.snm
+*.vrb
+*.bcf
+*.run.xml

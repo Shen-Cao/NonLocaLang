@@ -1,11 +1,12 @@
 """Command-line entry point for reproducible small-game experiments."""
 import argparse
-from dataclasses import asdict
+from dataclasses import fields
 from fractions import Fraction
 import importlib.metadata
 import json
 import math
 import platform
+import sys
 
 from .analysis import (certify_nonsignalling, classical_value, nonsignalling_value,
                        npa_bound, xor_quantum_value)
@@ -32,14 +33,17 @@ def json_default(value):
 
 
 def result_record(result, include_witness=False):
-    data = asdict(result)
-    if not include_witness:
-        data.pop("witness", None)
-    return data
+    return {field.name: getattr(result, field.name) for field in fields(result)
+            if include_witness or field.name != "witness"}
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "task":
+        from .task_cli import main as task_main
+        return task_main(argv[1:])
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     epilog="Resource tasks: nonlocalgames task --help")
     parser.add_argument("game", choices=tuple(GAMES) + ("json",))
     parser.add_argument("--file", help="versioned verifier JSON, required for game=json")
     parser.add_argument("--method", choices=("local", "ns", "ns-exact", "npa1", "npa1ab", "xor"),

@@ -27,3 +27,27 @@ def test_cli_exact_ns(capsys):
     result = json.loads(capsys.readouterr().out)["result"]
     assert result["guarantee"] == "exact"
     assert result["value"] == "1/3"
+
+
+def test_summary_does_not_copy_omitted_witness():
+    from nonlocalgames.analysis import AnalysisResult
+    from nonlocalgames.cli import result_record
+
+    class NoCopyWitness:
+        def __deepcopy__(self, memo):
+            raise AssertionError('omitted witnesses must not be copied')
+
+    result = AnalysisResult(0, 'local', 'test', 'exact', 'optimal', witness=NoCopyWitness())
+    assert 'witness' not in result_record(result)
+
+
+def test_main_routes_serialized_resource_tasks(tmp_path, capsys):
+    from nonlocalgames import AnalysisTask, ResourceSpec
+    from nonlocalgames.core.resource_serialization import dump_task
+    from nonlocalgames.games import chsh
+    path = tmp_path / 'task.json'
+    dump_task(AnalysisTask(chsh(), ResourceSpec('local', shared_randomness='forbidden')), path)
+    main(['task', '--file', str(path), '--method', 'local'])
+    result = json.loads(capsys.readouterr().out)
+    assert result['result']['value'] == '3/4'
+    assert result['resource']['shared_randomness'] == 'forbidden'

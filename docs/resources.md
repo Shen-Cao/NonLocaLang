@@ -135,7 +135,9 @@ excluded. A network contract uses `Resource.LOCAL` or `Resource.QUANTUM_FINITE`
 and explicitly sets `shared_randomness=SharedRandomness.FORBIDDEN`. A fixed global
 state cannot substitute for source factors. Quantum dimension bounds and
 product/PPT/projective restrictions apply to the supplied global party state and
-local measurements after the source tensor factors have been assembled. See
+local measurements after the source tensor factors have been assembled. Local
+POVM dimensions equal the product of incident factor dimensions; a unary source
+can represent an explicit local ancilla, with no implicit projective dilation. See
 [network witnesses and compatibility](networks.md) for construction,
 serialization, nonlinear checks, and the exact no-input bilocal fragment.
 
@@ -149,3 +151,27 @@ sources are [dimension-constrained relaxations](https://arxiv.org/abs/1412.0924)
 [the PPT criterion](https://arxiv.org/abs/quant-ph/9604005),
 [its low-dimensional converse](https://arxiv.org/abs/quant-ph/9605038), and
 [bilocal correlations](https://arxiv.org/abs/1112.4502).
+
+## Serialized tasks from the command line
+
+Write a task with `dump_task(task, "output/task.json")` after creating the output
+directory. This preserves the verifier and all resource restrictions, including a
+numerical fixed state or source graph. Inspect supported methods before solving:
+
+```sh
+python -m nonlocalgames task --file output/task.json --capabilities
+python -m nonlocalgames task --file output/task.json --method seesaw \
+  --solver SCS --seed 7 --restarts 2 --max-iterations 15 --witness
+```
+
+The second command applies only when the declared resource supports see-saw.
+Classical or product-resource tasks can use `--method local`; unsupported methods
+are rejected. Quantum tasks need explicit method selection. `state_sdp` is listed
+as API-only because it additionally needs supplied measurement operators.
+
+Output records the resource snapshot, solver settings, package versions, evidence
+status, and optional witness. Ordinary quantum witnesses use
+`quantum.serialization.strategy_to_dict/from_dict`; network witnesses retain their
+source factors through the network schemas. Re-import a witness and call the
+original task's `evaluate` method to check it against the original restrictions.
+Serialization preserves numerical data and tolerances; it adds no proof guarantee.

@@ -99,3 +99,13 @@ tests/               mathematical regressions and interface validation
 report/              modular LaTeX article and public bibliography
 docs/                architecture, usage, and research development
 ```
+
+Resource tasks can also be run from their serialized configuration:
+
+```sh
+python -m nonlocalgames task --file output/task.json --capabilities
+python -m nonlocalgames task --file output/task.json --method seesaw --seed 7 --witness
+```
+
+Create the task file with `core.resource_serialization.dump_task`; the
+[resource API guide](docs/resources.md) explains which methods enforce each contract.

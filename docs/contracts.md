@@ -50,3 +50,24 @@ The resource and task codecs live in `core.resource_serialization`:
 and explicitly mark fixed-state arrays as numerical complex matrices with a
 validation tolerance. They do not encode executable code, solver defaults,
 local file references, or implied numerical proof guarantees.
+
+Independent-source networks add an explicit `network=SourceNetwork(...)` field.
+They require `shared_randomness="forbidden"`: mixing whole network branches using
+an external global selector can destroy source independence. The current graph
+contract applies to local and finite quantum resources. Source order and endpoint
+order determine quantum tensor factors and are preserved in serialization.
+
+A network task accepts only a corresponding factorized network witness in
+`evaluate`; passing an unrestricted global quantum state is rejected. Global
+product/PPT/measurement restrictions remain checked on the assembled party state
+and local measurements. A global fixed state is not accepted as a substitute for
+independent source states. The graph is preserved in resource schema v2; schema v1
+loads as an ordinary resource without a graph.
+
+For classical networks, every ordinary deterministic local strategy is available
+by ignoring sources, while every network behavior is ordinary local. Consequently
+all linear game values equal the ordinary classical value even though behavior
+sets differ. Exact local optimization returns a source-ignoring network witness.
+General quantum-network optimization is unsupported; the unrestricted product-state
+subcase still has the exact local optimum. See [network analysis](networks.md) for
+nonlinear tests and constructive compatibility methods.

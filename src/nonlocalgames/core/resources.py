@@ -8,6 +8,7 @@ from .game import Game
 
 if TYPE_CHECKING:
     from ..quantum.states import FixedState
+    from ..networks.structure import SourceNetwork
 
 
 class Resource(str, Enum):
@@ -51,11 +52,22 @@ class ResourceSpec:
     ppt_cuts: tuple[tuple[int, ...], ...] = field(default=(), kw_only=True)
     measurement_class: MeasurementClass = field(default=MeasurementClass.POVM, kw_only=True)
     fixed_state: "FixedState | None" = field(default=None, kw_only=True)
+    network: "SourceNetwork | None" = field(default=None, kw_only=True)
 
     def __post_init__(self):
         for key, enum in (("kind", Resource), ("shared_randomness", SharedRandomness),
                           ("state_constraint", StateConstraint), ("measurement_class", MeasurementClass)):
             object.__setattr__(self, key, enum(getattr(self, key)))
+        if self.network is not None:
+            from ..networks.structure import SourceNetwork
+            if not isinstance(self.network, SourceNetwork):
+                raise TypeError("network must be a SourceNetwork")
+            if self.kind not in (Resource.LOCAL, Resource.QUANTUM_FINITE):
+                raise ValueError("Source networks currently require local or finite quantum resources")
+            if self.shared_randomness != SharedRandomness.FORBIDDEN:
+                raise ValueError("Independent-source networks require forbidden external shared randomness")
+            if self.fixed_state is not None:
+                raise ValueError("Declare independent source states in a network witness, not a global fixed state")
         dims = self.local_dimensions
         if dims is not None:
             dims = tuple(dims)
@@ -89,7 +101,10 @@ class ResourceSpec:
             ) > self.fixed_state.tolerance:
                 raise ValueError("Fixed state does not satisfy the product-state restriction")
         count = len(dims) if dims is not None else (
-            len(self.fixed_state.dimensions) if self.fixed_state is not None else None)
+            len(self.fixed_state.dimensions) if self.fixed_state is not None else (
+                self.network.parties if self.network is not None else None))
+        if self.network is not None and count is not None and self.network.parties != count:
+            raise ValueError("Network and dimension bounds have different party counts")
         if cuts and count is not None:
             from ..quantum.states import validate_ppt_cuts
             object.__setattr__(self, "ppt_cuts", validate_ppt_cuts(cuts, count))
@@ -104,6 +119,8 @@ class AnalysisTask:
         if not isinstance(self.game, Game) or not isinstance(self.resource, ResourceSpec):
             raise TypeError("An AnalysisTask requires a Game and ResourceSpec")
         count = self.game.scenario.parties
+        if self.resource.network is not None and self.resource.network.parties != count:
+            raise ValueError("Network and game have different party counts")
         dims = self.resource.local_dimensions
         if dims is not None and len(dims) != count:
             raise ValueError("Provide one local dimension bound per party")
@@ -130,5 +147,8 @@ class AnalysisTask:
 
     def evaluate(self, strategy):
         """Check a supplied quantum branch against this contract and score it."""
-        from ..quantum.validation import evaluate
+        if self.resource.network is not None:
+            from ..networks.tasks import evaluate
+        else:
+            from ..quantum.validation import evaluate
         return evaluate(self, strategy)

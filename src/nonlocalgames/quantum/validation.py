@@ -12,6 +12,8 @@ from .strategy import QuantumStrategy
 def validate_strategy(task, strategy):
     """Validate one branch; external shared mixing does not relax branch constraints."""
     r = task.resource
+    if r.network is not None:
+        raise ValueError("A network resource requires a factorized network witness")
     if r.kind != Resource.QUANTUM_FINITE:
         raise NotImplementedError("Explicit tensor-strategy checking requires quantum_finite")
     if not isinstance(strategy, QuantumStrategy):

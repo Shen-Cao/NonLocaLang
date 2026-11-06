@@ -6,6 +6,10 @@ from .resources import MeasurementClass, Resource, SharedRandomness, StateConstr
 
 def capabilities(task):
     r, s = task.resource, task.game.scenario
+    if r.network is not None:
+        if r.kind == Resource.LOCAL or r.state_constraint == StateConstraint.PRODUCT:
+            return ("local",)
+        return ()
     if r.kind == Resource.LOCAL:
         return ("local",)
     if r.kind == Resource.NONSIGNALLING:
@@ -49,6 +53,17 @@ def solve(task, method, options):
                                   f"available methods: {capabilities(task)}")
     if method == "local":
         result = classical_value(task.game, **options)
+        if r.network is not None:
+            from ..networks.classical import deterministic_network_strategy
+            if r.kind == Resource.LOCAL:
+                witness = deterministic_network_strategy(r.network, task.game.scenario, result.witness)
+            else:
+                from ..networks.tasks import deterministic_quantum_network_strategy
+                witness = deterministic_quantum_network_strategy(r.network, task.game.scenario, result.witness)
+            return replace(result, resource="classical_network" if r.kind == Resource.LOCAL else "quantum_network_product",
+                           witness=witness, diagnostics={**result.diagnostics,
+                           "witness_kind": "source_ignoring_deterministic_strategy",
+                           "scope": "linear score only; network membership remains nonconvex"})
         if r.kind == Resource.LOCAL:
             label = "local_shared_randomness" if r.shared_randomness == SharedRandomness.ALLOWED else "local_product"
         else:
@@ -77,6 +92,7 @@ def solve(task, method, options):
                               "heuristic", {**residuals, "history": result.history,
                               "restart_scores": result.restart_scores, "seed": result.seed,
                               "solver": result.solver, "solver_statuses": result.solver_statuses,
+                              "state_updates": result.state_updates, "ppt_cuts": result.ppt_cuts,
                               "shared_randomness": r.shared_randomness.value}, result.strategy)
     from ..quantum import optimize_state
     from ..quantum.validation import validate_measurements

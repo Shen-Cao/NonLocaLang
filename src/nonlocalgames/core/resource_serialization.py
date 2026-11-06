@@ -5,7 +5,7 @@ from pathlib import Path
 from .resources import AnalysisTask, ResourceSpec
 from .serialization import from_dict as game_from_dict, to_dict as game_to_dict
 
-RESOURCE_SCHEMA = "nonlocalgames.resource.v1"
+RESOURCE_SCHEMA = "nonlocalgames.resource.v2"
 TASK_SCHEMA = "nonlocalgames.task.v1"
 
 
@@ -14,7 +14,9 @@ def resource_to_dict(resource):
     state = None if fixed is None else {"encoding": "complex_float64",
             "dimensions": list(fixed.dimensions), "tolerance": fixed.tolerance,
             "real": fixed.state.real.tolist(), "imag": fixed.state.imag.tolist()}
+    from ..networks.serialization import network_to_dict
     return {"schema": RESOURCE_SCHEMA, "kind": resource.kind.value,
+            "network": None if resource.network is None else network_to_dict(resource.network),
             "local_dimensions": None if resource.local_dimensions is None else list(resource.local_dimensions),
             "shared_randomness": resource.shared_randomness.value,
             "state_constraint": resource.state_constraint.value,
@@ -25,6 +27,9 @@ def resource_to_dict(resource):
 def resource_from_dict(data):
     fields = {"schema", "kind", "local_dimensions", "shared_randomness", "state_constraint",
               "measurement_class", "ppt_cuts", "fixed_state"}
+    if isinstance(data, dict) and data.get("schema") == "nonlocalgames.resource.v1" and set(data) == fields:
+        data = {**data, "schema": RESOURCE_SCHEMA, "network": None}
+    fields.add("network")
     if not isinstance(data, dict) or set(data) != fields or data["schema"] != RESOURCE_SCHEMA:
         raise ValueError("Invalid resource document fields or schema")
     fixed = data["fixed_state"]
@@ -39,7 +44,9 @@ def resource_from_dict(data):
         if real.shape != imag.shape:
             raise ValueError("Fixed-state real and imaginary parts must have identical shapes")
         fixed = FixedState(real + 1j * imag, fixed["dimensions"], fixed["tolerance"])
-    return ResourceSpec(data["kind"], data["local_dimensions"],
+    from ..networks.serialization import network_from_dict
+    network = None if data["network"] is None else network_from_dict(data["network"])
+    return ResourceSpec(data["kind"], data["local_dimensions"], network=network,
                         shared_randomness=data["shared_randomness"], state_constraint=data["state_constraint"],
                         measurement_class=data["measurement_class"], ppt_cuts=data["ppt_cuts"], fixed_state=fixed)
 

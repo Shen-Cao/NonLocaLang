@@ -50,7 +50,7 @@ def test_invalid_search_configuration(kwargs):
         seesaw(game, **kwargs)
 
 
-def test_reject_multipartite_search():
+def test_reject_mismatched_multipartite_dimensions():
     game = _game(Scenario((1, 1, 1), (2, 2, 2)), lambda x, a: True)
-    with pytest.raises(ValueError, match="two parties"):
-        seesaw(game)
+    with pytest.raises(ValueError, match="per party"):
+        seesaw(game, dimensions=(2, 2))

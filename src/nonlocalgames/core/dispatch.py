@@ -28,9 +28,9 @@ def capabilities(task):
         ):
             methods.append("xor")
     if r.kind == Resource.QUANTUM_FINITE:
-        if s.parties == 2 and r.measurement_class == MeasurementClass.POVM and (
-            r.local_dimensions is not None or r.fixed_state is not None
-        ):
+        measurement_supported = (r.measurement_class == MeasurementClass.POVM or
+                                 all(a <= 2 for a in s.output_sizes))
+        if measurement_supported and (r.local_dimensions is not None or r.fixed_state is not None):
             methods.append("seesaw")
         if r.fixed_state is None and r.state_constraint != StateConstraint.PRODUCT:
             methods.append("state_sdp")
@@ -82,17 +82,18 @@ def solve(task, method, options):
     from ..quantum.validation import validate_strategy
     if method == "seesaw":
         from ..quantum import seesaw
-        if any(key in options for key in ("dimensions", "fixed_state", "ppt_cuts")):
-            raise ValueError("State, dimension, and PPT restrictions must come from ResourceSpec")
+        if any(key in options for key in ("dimensions", "fixed_state", "ppt_cuts", "measurement_class")):
+            raise ValueError("State, dimension, PPT, and measurement restrictions must come from ResourceSpec")
         dims = r.fixed_state.dimensions if r.fixed_state is not None else r.local_dimensions
         result = seesaw(task.game, dimensions=dims, fixed_state=r.fixed_state,
-                        ppt_cuts=r.ppt_cuts, **options)
+                        ppt_cuts=r.ppt_cuts, measurement_class=r.measurement_class.value, **options)
         residuals = validate_strategy(task, result.strategy)
         return AnalysisResult(result.value, r.kind.value, "restricted_seesaw", "numerical_witness",
                               "heuristic", {**residuals, "history": result.history,
                               "restart_scores": result.restart_scores, "seed": result.seed,
                               "solver": result.solver, "solver_statuses": result.solver_statuses,
                               "state_updates": result.state_updates, "ppt_cuts": result.ppt_cuts,
+                              "measurement_class": r.measurement_class.value,
                               "shared_randomness": r.shared_randomness.value}, result.strategy)
     from ..quantum import optimize_state
     from ..quantum.validation import validate_measurements

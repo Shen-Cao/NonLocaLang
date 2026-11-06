@@ -1,5 +1,6 @@
 """Numerical block updates used by fixed-dimensional strategy searches."""
 from functools import reduce
+from itertools import product
 from math import prod
 
 import numpy as np
@@ -30,25 +31,56 @@ def bell_operator(game, measurements, dimensions):
     return (bell + bell.conj().T) / 2
 
 
-def optimize_party(coefficients, state, measurements, dimensions, party, solver, options):
+def effective_operators(coefficients, state, measurements, dimensions, party):
+    """Contract all other parties into local objective matrices, in explicit factor order.
+
+    After moving this party first, rho has entries rho[i,r,k,s]. Contracting
+    other-party effects O gives H[i,k]=sum_{r,s}rho[i,r,k,s]O[s,r], so the
+    contribution of a local effect E is tr(E H). No real-state assumption is used.
+    """
+    count = len(dimensions)
+    if coefficients.ndim != 2*count or not 0 <= party < count:
+        raise ValueError("Coefficient tensor or party index does not match the tensor factors")
+    input_sizes, output_sizes = coefficients.shape[:count], coefficients.shape[count:]
+    others = tuple(i for i in range(count) if i != party)
+    order = (party,) + others
+    dimension, rest = dimensions[party], prod(dimensions[i] for i in others)
+    rho = state.reshape(dimensions + dimensions).transpose(
+        order + tuple(i+count for i in order)).reshape(dimension, rest, dimension, rest)
+    effective = [[np.zeros((dimension, dimension), dtype=complex)
+                  for _ in range(output_sizes[party])] for _ in range(input_sizes[party])]
+    for other_x in product(*(range(input_sizes[i]) for i in others)):
+        for other_a in product(*(range(output_sizes[i]) for i in others)):
+            operator = reduce(np.kron, (measurements[i][x][a] for i, x, a in
+                                        zip(others, other_x, other_a)), np.ones((1, 1)))
+            marginal = np.einsum("irks,sr->ik", rho, operator, optimize=True)
+            x, a = [0]*count, [0]*count
+            for i, setting, output in zip(others, other_x, other_a):
+                x[i], a[i] = setting, output
+            for setting in range(input_sizes[party]):
+                x[party] = setting
+                for output in range(output_sizes[party]):
+                    a[party] = output
+                    effective[setting][output] += coefficients[tuple(x+a)]*marginal
+    return tuple(tuple((h+h.conj().T)/2 for h in povm) for povm in effective)
+
+
+def optimize_party(coefficients, state, measurements, dimensions, party, solver, options,
+                   *, measurement_class="povm"):
+    """Optimize one party while all other measurements and the state remain fixed."""
+    from ._measurements import projective_update, validate_measurement_class
+    measurement_class = validate_measurement_class(measurement_class, coefficients.shape[len(dimensions):])
+    effective = effective_operators(coefficients, state, measurements, dimensions, party)
+    if measurement_class == "projective":
+        return tuple(projective_update(povm) for povm in effective), ["analytic_projective"]*len(effective)
     import cvxpy as cp
 
-    rho = state.reshape(dimensions[0], dimensions[1], dimensions[0], dimensions[1])
     updated, statuses = [], []
-    for setting, old_povm in enumerate(measurements[party]):
-        effective = [np.zeros((dimensions[party],) * 2, dtype=complex) for _ in old_povm]
-        for x, y, a, b in np.ndindex(coefficients.shape):
-            if (x, y)[party] != setting:
-                continue
-            if party == 0:
-                marginal = np.einsum("ijkl,lj->ik", rho, measurements[1][y][b])
-            else:
-                marginal = np.einsum("ijkl,ki->jl", rho, measurements[0][x][a])
-            effective[(a, b)[party]] += coefficients[x, y, a, b] * marginal
+    for objective_matrices in effective:
         effects = [cp.Variable((1, 1), symmetric=True) if dimensions[party] == 1
-                   else cp.Variable((dimensions[party],) * 2, hermitian=True) for _ in old_povm]
-        effective = [h.real if dimensions[party] == 1 else (h + h.conj().T) / 2 for h in effective]
-        terms = [cp.sum(cp.multiply(effect, h.T)) for effect, h in zip(effects, effective)]
+                   else cp.Variable((dimensions[party],) * 2, hermitian=True) for _ in objective_matrices]
+        objective_matrices = [h.real if dimensions[party] == 1 else h for h in objective_matrices]
+        terms = [cp.sum(cp.multiply(effect, h.T)) for effect, h in zip(effects, objective_matrices)]
         objective = sum(cp.real(term) if term.is_complex() else term for term in terms)
         problem = cp.Problem(cp.Maximize(objective), [effect >> 0 for effect in effects]
                              + [sum(effects) == np.eye(dimensions[party])])

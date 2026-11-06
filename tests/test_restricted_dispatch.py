@@ -59,3 +59,18 @@ def test_task_ppt_search_retains_transpose_constraint():
                         solver_options={'eps': 1e-8})
     assert result.value == pytest.approx(.75, abs=1e-6)
     assert result.diagnostics['minimum_ppt_eigenvalue'] >= -1e-7
+
+
+def test_multipartite_projective_task_propagates_measurement_contract():
+    from nonlocalgames.games import ghz
+    from nonlocalgames.quantum import ghz_strategy
+    fixed = FixedState(ghz_strategy().state, (2, 2, 2))
+    task = AnalysisTask(ghz(), ResourceSpec('quantum_finite', fixed_state=fixed,
+                        measurement_class='projective'))
+    result = task.solve(method='seesaw', seed=7, restarts=3, max_iterations=20)
+    assert result.value == pytest.approx(1, abs=1e-5)
+    assert result.diagnostics['projectivity_residual'] < 1e-10
+    assert result.diagnostics['measurement_class'] == 'projective'
+    np.testing.assert_array_equal(result.witness.state, fixed.state)
+    with pytest.raises(ValueError, match='ResourceSpec'):
+        task.solve(method='seesaw', measurement_class='povm')

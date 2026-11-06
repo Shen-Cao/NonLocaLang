@@ -42,8 +42,8 @@ def test_contract_validation_and_capabilities():
                      state_constraint='ppt', ppt_cuts=((0, 1),)))
     r = ResourceSpec(Resource.QUANTUM_FINITE, (2, 2), measurement_class='projective')
     task = AnalysisTask(chsh(), r)
-    assert 'seesaw' not in task.capabilities()
-    for method in ('npa', 'xor', 'seesaw'):
+    assert 'seesaw' in task.capabilities()
+    for method in ('npa', 'xor'):
         with pytest.raises(NotImplementedError):
             task.solve(method=method)
 
@@ -97,3 +97,12 @@ def test_numerical_product_fixed_state_does_not_claim_exact_value():
     assert 'local' not in task.capabilities()
     with pytest.raises(NotImplementedError):
         task.solve()
+
+
+def test_projective_search_rejects_unsupported_output_cardinality():
+    from nonlocalgames import Game, Scenario
+    game = Game.from_rule(Scenario((1, 1), (3, 2)), lambda x, a: 1)
+    task = AnalysisTask(game, ResourceSpec('quantum_finite', (2, 2), measurement_class='projective'))
+    assert 'seesaw' not in task.capabilities()
+    with pytest.raises(NotImplementedError):
+        task.solve(method='seesaw')

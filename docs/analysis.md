@@ -210,3 +210,15 @@ raw objectives and recomputed witness scores remain separate. A direct low-level
 Run `python scripts/resource_benchmark.py` to compare restrictions using declared
 solver settings and initialization seed. The script reports exact local/product
 values alongside explicitly numerical quantum witnesses.
+
+## Rechecking exact deterministic witnesses
+
+`AnalysisTask.evaluate(result.witness)` accepts the deterministic response tables
+returned by exact local and symbolic product-state optimization. It validates the
+input/output labels and computes the score exactly, returning `exact_witness`.
+This checks the supplied witness, not optimality; the optimizer's separate exact
+claim comes from its exhaustive search. `classical.DeterministicStrategy` provides
+a typed version with exact behavior generation, and
+`classical.deterministic_quantum_strategy` embeds the tables using one-dimensional
+product states and identity/zero projectors. Prescribed numerical fixed states
+are not silently replaced by that embedding.

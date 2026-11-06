@@ -146,9 +146,6 @@ class AnalysisTask:
         return solve(self, method, options)
 
     def evaluate(self, strategy):
-        """Check a supplied quantum branch against this contract and score it."""
-        if self.resource.network is not None:
-            from ..networks.tasks import evaluate
-        else:
-            from ..quantum.validation import evaluate
+        """Recheck and score a deterministic, quantum, or factorized network witness."""
+        from .evaluation import evaluate
         return evaluate(self, strategy)

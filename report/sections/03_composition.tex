@@ -1,0 +1,124 @@
+\section{Primitives and proof obligations for composition}
+\label{sec:composition}
+
+The useful primitives are not a list of famous inequalities. They are typed
+constructors for arenas, samplers, predicates, resources, and transformations.
+An XOR predicate, for example, specifies
+$\bigoplus_i a_i=f(x)$; a consistency predicate compares overlapping answer
+components; a graph predicate checks a relation between vertex labels. CHSH,
+GHZ parity tests, and the magic-square game are compositions of these small
+rules with distinct arenas and resource witnesses.
+
+\subsection{Lossless transformations}
+\begin{proposition}[Local relabeling and affine score changes]
+Let each question alphabet and each answer alphabet conditional on the local
+question be relabeled bijectively. Transport the sampler, payoff, and strategy
+by the same local relabeling. Every resource class closed under these
+relabelings has the same game value before and after the transformation.
+Moreover, for $\alpha>0$ and an input-only function $b(x)$,
+\[
+ V'(a,x)=\alpha V(a,x)+b(x)
+ \quad\Longrightarrow\quad
+ \val_{\mathcal R}(G')=\alpha\val_{\mathcal R}(G)
+ +\sum_x\mu(x)b(x).
+\]
+The maximizing behaviors coincide under the transport.
+\end{proposition}
+\begin{proof}
+A local bijection gives an invertible correspondence between admissible
+strategies; changing summation indices preserves every score. Normalization
+$\sum_a p(a\mid x)=1$ proves the affine identity pointwise, so it also holds
+after taking the supremum.
+\end{proof}
+Negative scaling swaps maximization and minimization. Scaling a winning
+probability does not preserve its statistical interpretation or robustness
+parameter: a score deficit $\varepsilon'$ becomes $\varepsilon'/\alpha$.
+
+The distinction between local and global input processing is essential. A
+map depending on the complete input tuple may reveal another party's question
+and change the resource model. Local stochastic preprocessing/postprocessing
+is a safe strategy map for ordinary local and quantum models, but is usually
+not invertible and therefore need not preserve values in both directions.
+
+\subsection{Mixtures: whether a tag is visible is part of the game}
+For games $G_j$ on a common arena and weights $\lambda_j\geq0$ summing to one,
+a \emph{hidden mixture} has coefficient table
+$c=\sum_j\lambda_j c_j$. It can retain a verifier by using
+\[
+ \mu(x)=\sum_j\lambda_j\mu_j(x),\qquad
+ V(a,x)=\frac{\sum_j\lambda_j\mu_j(x)V_j(a,x)}{\mu(x)}
+\]
+when $\mu(x)>0$, with arbitrary payoff at zero-mass questions. The players
+receive no extra component tag. The questions themselves may still convey
+partial or complete information about the component.
+
+\begin{proposition}[Mixture bound and saturation]
+For a hidden mixture $G=\sum_j\lambda_jG_j$,
+\begin{equation}
+ \val_{\mathcal R}(G)\leq\sum_j\lambda_j\val_{\mathcal R}(G_j).
+ \label{eq:mixture}
+\end{equation}
+If a single strategy simultaneously attains every component optimum with
+positive weight, equality holds. If component bounds $u_j$ are valid, and a
+strategy has mixture score at least $\sum_j\lambda_j u_j-\varepsilon$, then
+\[
+ 0\leq u_j-S_{G_j}(p)\leq\varepsilon/\lambda_j
+ \quad(\lambda_j>0).
+\]
+\end{proposition}
+\begin{proof}
+Bound each summand separately. For the last assertion, the weighted sum of
+the nonnegative component deficits is at most $\varepsilon$.
+\end{proof}
+This elementary deficit calculus is useful for rigidity constructions: a
+near-optimal combined score forces each consistency test to be nearly
+satisfied. It does not establish that the local extraction maps obtained from
+different component tests are compatible.
+
+A \emph{public mixture} sends the same component tag $j$ to every party. When
+the model permits the necessary conditional strategies and common resource
+realization, its value is the weighted sum of the component values (with
+suprema interpreted through arbitrarily good strategies). Unrestricted local
+and finite-dimensional quantum models permit this by pre-sharing the required
+resources and choosing measurements using the tag. Fixed dimension, fixed
+state, and independent-source contracts require a separate closure check.
+Erasing a public tag or revealing a hidden one is not a compiler optimization.
+
+\subsection{Parallel products and lowerings}
+The parallel conjunction $G\otimes H$ sends each player the pair of their
+questions, uses independent referee sampling, and accepts iff both component
+predicates accept. More generally its payoff is the product of nonnegative
+payoffs. If the resource class is closed under independent tensor/product
+strategies, then
+\[
+ \val_{\mathcal R}(G\otimes H)\geq
+ \val_{\mathcal R}(G)\val_{\mathcal R}(H).
+\]
+The product witness proves this inequality. An optimal joint strategy may
+couple answers across coordinates; no general multiplicativity equality is
+licensed. Parallel conjunction is also different from an XOR combination of
+winning conditions, for which specialized theorems may apply.
+For example, exact deterministic optimization of two parallel CHSH games
+gives classical value $10/16$, which is strictly greater than
+$(3/4)^2=9/16$. This benchmark is reproduced by the implementation's
+composition tests.
+
+Every proposed lowering should expose three items: an admissible-strategy
+map, its score relation, and its resource/size cost. For example, forgetting a
+dimension bound or source independence enlarges a feasible set and gives an
+upper bound. Restricting to an explicit family of strategies gives a lower
+bound. Projective dilation preserves unrestricted one-round quantum values
+but consumes dimension. A finite coefficient expansion preserves scores but
+may consume exponential memory. These contracts make abstraction cost
+visible instead of hiding it behind a uniform function name.
+
+\begin{proposition}[Resource monotonicity]
+If $\mathcal R\subseteq\mathcal S$ in the same arena, then
+$\val_{\mathcal R}(G)\leq\val_{\mathcal S}(G)$ for every payoff.
+Consequently an upper bound for $\mathcal S$ is an upper bound for
+$\mathcal R$, and a feasible $\mathcal R$ witness is a feasible
+$\mathcal S$ witness.
+\end{proposition}
+\begin{proof}
+The supremum over a subset cannot exceed the supremum over the full set.
+\end{proof}

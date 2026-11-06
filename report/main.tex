@@ -1,0 +1,54 @@
+\documentclass[11pt]{article}
+\usepackage[T1]{fontenc}
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb,amsthm,booktabs,longtable,array}
+\usepackage[colorlinks=true,allcolors=blue]{hyperref}
+\usepackage{microtype}
+\newtheorem{definition}{Definition}[section]
+\newtheorem{proposition}[definition]{Proposition}
+\newtheorem{remark}[definition]{Remark}
+\newcommand{\R}{\mathbb R}
+\newcommand{\C}{\mathbb C}
+\newcommand{\Tr}{\operatorname{Tr}}
+\newcommand{\id}{\mathbb I}
+\newcommand{\Lset}{\mathcal L}
+\newcommand{\Q}{\mathcal Q}
+\newcommand{\NS}{\mathcal{NS}}
+\newcommand{\val}{\omega}
+\newcommand{\ket}[1]{\lvert #1\rangle}
+\newcommand{\bra}[1]{\langle #1\rvert}
+\title{NonLocaLang: Resource-Aware Primitives for Nonlocal Games}
+\author{NonLocaLang research project}
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}
+A useful abstraction for nonlocal games must preserve the players' information and
+the admissible resources, not only the referee's score. We propose a layered
+representation separating the experimental arena, verifier, resource model,
+strategy witness, and certification question. Finite classical one-round games
+have an exact tabular representation and several useful algebraic constructors.
+Independent sources, trusted quantum interfaces, and sequential interactions
+require additional semantic structure. We establish elementary preservation and
+obstruction results that constrain sound compiler passes, organize numerical and
+symbolic analyses by the direction of their guarantees, and specify a concrete
+implementation scope. A central distinction is between certifying a value,
+certifying a behavior, and extracting a target state or measurement. The framework
+is a research architecture with a working finite-game core, not a universal
+decision procedure or a claim that arbitrary games have efficient analyses.
+\end{abstract}
+\begingroup
+\small
+\tableofcontents
+\endgroup
+\clearpage
+\input{sections/01_semantics}
+\input{sections/02_resources}
+\input{sections/03_composition}
+\input{sections/04_analysis}
+\input{sections/05_self_testing}
+\input{sections/06_architecture}
+\input{sections/07_research}
+\bibliographystyle{plainurl}
+\bibliography{bibliography}
+\end{document}

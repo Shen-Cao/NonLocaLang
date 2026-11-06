@@ -1,0 +1,104 @@
+\section{Self-testing is a typed extraction claim}
+\label{sec:selftest}
+
+Classical input/output data can constrain untrusted quantum apparatus up to
+unavoidable freedoms. The original self-testing formulation compares devices
+with a reference realization through local changes of representation
+\cite{mayers2004}; modern definitions distinguish state and measurement
+certification and quantify robustness \cite{supic2020}.
+
+\subsection{State extraction and the right quantifiers}
+Fix a resource class of tensor-product strategies, a game $G$, a target pure
+state $\ket\phi$, and a threshold $u$. Define target overlap after local
+extraction by
+\begin{equation}
+ F_{\rm ext}(\rho,\phi)=
+ \sup_{\Lambda_1,\ldots,\Lambda_n}
+ \bra\phi(\Lambda_1\otimes\cdots\otimes\Lambda_n)(\rho)\ket\phi,
+ \label{eq:extraction}
+\end{equation}
+where each $\Lambda_i$ is a local completely positive trace-preserving map
+into the corresponding target system. A robust state-extraction statement is
+\begin{equation}
+ \forall (\rho,M)\in\mathcal R:\quad
+ S_G(p_{\rho,M})\geq u-\varepsilon
+ \ \Longrightarrow\ F_{\rm ext}(\rho,\phi)\geq1-f(\varepsilon).
+ \label{eq:robust}
+\end{equation}
+The channels can depend on the unknown realization; the target and function
+$f$ cannot. An exact self-test has $u=\val_{\mathcal R}(G)$, $f(0)=0$,
+and a nonvacuous optimal realization. A robust self-test requires
+$f(\varepsilon)\to0$ as $\varepsilon\to0$. The fidelity convention in
+Eq.~\eqref{eq:extraction} is the overlap, not its square root.
+
+Local isometries give a representation-level description:
+the physical state maps to a target tensor an unobserved auxiliary state.
+Auxiliary entanglement, unused Hilbert-space sectors, and local basis choices
+are permitted. Measurement certification additionally compares the action of
+physical operators on the tested state with target operators under the same
+local maps. Operator-norm equality on the entire physical Hilbert space is
+generally unjustified because the experiment does not probe unused sectors.
+
+Pairwise convertibility of two optimal physical realizations is therefore
+not the definition of a unique self-tested target. Both may contain a common
+extractable target with different auxiliary systems. To disprove extraction
+of a proposed $\phi$, one must exhibit an admissible optimum for which
+$F_{\rm ext}<1$, or establish another obstruction to the stated equivalence.
+Distinct numerical state vectors, Schmidt spectra before removal of auxiliary
+factors, or inequivalent measurement choices alone do not settle this question.
+
+\begin{proposition}[A common target with incomparable realizations]
+Let $\ket{\Phi_d}=d^{-1/2}\sum_{j=0}^{d-1}\ket{jj}$. The states
+$\ket{\Phi_6}$ and $\ket{\Phi_{10}}$ both attain the optimal CHSH score, but
+neither can be transformed into the other by a product of local trace-preserving
+quantum channels. Both exactly extract $\ket{\Phi_2}$.
+\end{proposition}
+\begin{proof}
+Relabeling a local basis factors $\Phi_6$ as $\Phi_2\otimes\Phi_3$ and
+$\Phi_{10}$ as $\Phi_2\otimes\Phi_5$. Use the CHSH measurements on the first
+factor and discard the second for extraction. If product local channels
+transform a pure $\Phi_d$ into a pure $\Phi_m$, their local Stinespring
+isometries transform it into $\Phi_m\otimes\eta$ for a pure environment state
+$\eta$. Local isometries preserve Schmidt rank, hence $d=mr$ with
+$r$ the Schmidt rank of $\eta$. Neither $6/10$ nor $10/6$ is an integer.
+\end{proof}
+This statement concerns product local channels without communication;
+LOCC convertibility is a different relation.
+
+\subsection{Complex conjugation and information loss}
+For a standard classical-interface Bell experiment, simultaneous complex
+conjugation of $\rho$ and all local POVM matrices preserves every probability:
+the Born probability is real and conjugation conjugates its trace. Complex
+conjugation is not in general a physical channel. Measurement targets with
+complex entries must therefore specify the tolerated conjugation freedom;
+flagged simulations can require more than a single unflagged choice
+\cite{mckague2010}. A compiler must not promise unique complex apparatus
+merely because a numerical optimizer chose one representative.
+
+There are three distinct uniqueness questions. A scalar Bell score can expose
+a unique behavior; a behavior can still admit many physical realizations;
+and these realizations may or may not extract a common target under the
+chosen equivalence. Strict convexity or uniqueness of an SDP moment matrix
+does not establish the last property. A finite moment relaxation may also
+contain points without a corresponding physical strategy.
+
+\subsection{What can be automated responsibly}
+An SOS certificate $u\id-\mathcal B=\sum_kP_k^\dagger P_k$ implies
+$P_k\ket\psi=0$ at exact saturation. At score deficit $\varepsilon$,
+\[
+ \sum_k\|P_k\ket\psi\|^2\leq\varepsilon.
+\]
+These relations are useful inputs to a proof of an extraction map; they are
+not themselves such a map. Analytic operator inequalities can bound extraction
+fidelity directly for important games \cite{kaniewski2016}. A further route
+is to choose an extraction ansatz and lower-bound its fidelity through moment
+relaxations, but the ansatz, operator identities, and bound direction must all
+be checked.
+
+The initial toolchain verifies a CHSH SOS identity and evaluates reference
+strategies. It does not claim to derive or verify a general self-testing
+theorem. A future certificate format should record the target, allowed
+dimensions, extraction maps or a proved construction, gauge conventions,
+distance metric, score normalization, robustness function, and a proof
+dependency list. This makes ``self-testing supported'' a precise capability
+rather than a boolean attached to a game name.

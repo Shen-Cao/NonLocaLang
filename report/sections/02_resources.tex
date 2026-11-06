@@ -1,0 +1,115 @@
+\section{Resources and the limits of a single backend}
+\label{sec:resources}
+
+\subsection{Distinct correlation models}
+For a fixed finite Bell arena, the unrestricted local set is
+\begin{equation}
+ p(a\mid x)=\sum_\lambda q(\lambda)\prod_i p_i(a_i\mid x_i,\lambda).
+ \label{eq:local}
+\end{equation}
+Its extreme points are deterministic response functions $a_i=f_i(x_i)$.
+Private randomization and shared randomization do not improve a linear optimum
+beyond the best deterministic response tuple.
+
+Finite-dimensional tensor-product quantum behaviors have the form
+\begin{equation}
+ p(a\mid x)=\Tr\left[\rho\bigotimes_i M^{(i)}_{a_i\mid x_i}\right],\qquad
+ M^{(i)}_{a_i\mid x_i}\succeq0,\quad
+ \sum_{a_i}M^{(i)}_{a_i\mid x_i}=\id.
+ \label{eq:quantum}
+\end{equation}
+The dimension-bounded set $\Q_{\boldsymbol d}$, the union $\Q_{\rm fin}$ over
+all finite dimensions, and its closure $\Q_{\rm a}$ are different types.
+For a dimension bound, one must also say whether free shared classical
+randomness is allowed: convexifying $\Q_{\boldsymbol d}$ can change membership,
+although it does not change a linear optimum. Projective-measurement dilation
+is harmless when local dimension is unrestricted, but generally changes a
+fixed-dimensional resource contract.
+
+In the commuting-operator set $\Q_{\rm c}$, all measurement operators act on a
+single Hilbert space, and operators assigned to distinct parties commute.
+Non-signalling behaviors satisfy, for every subset $S$ of parties,
+\begin{equation}
+ \sum_{a_{\bar S}}p(a_S,a_{\bar S}\mid x_S,x_{\bar S})
+ \quad\text{is independent of }x_{\bar S}.
+ \label{eq:ns}
+\end{equation}
+The useful inclusion chain is
+\begin{equation}
+ \Lset\subseteq\Q_{\rm fin}\subseteq\Q_{\rm a}
+ \subseteq\Q_{\rm c}\subseteq\NS.
+ \label{eq:chain}
+\end{equation}
+Equalities and strictness depend on the arena. In general $\Q_{\rm fin}$ is not
+closed \cite{slofstra2019}, and $\Q_{\rm a}\ne\Q_{\rm c}$ for some finite
+arenas \cite{ji2020}. The closure has the same supremum for every continuous
+linear score as $\Q_{\rm fin}$, but membership and attainment can differ.
+These are operational distinctions, not interchangeable solver labels.
+
+\subsection{Three extension axes}
+A useful taxonomy is by additional semantics, not by a fixed number of disjoint
+classes. The following axes can occur together.
+
+\paragraph{Independent sources and causal structure.}
+A network resource specification contains a source hypergraph. In a classical
+network, independent latent variables $\lambda_e$ obey
+\begin{equation}
+ p(a\mid x)=\int\prod_e dq_e(\lambda_e)
+ \prod_i p_i(a_i\mid x_i,(\lambda_e)_{e\ni i}).
+ \label{eq:network}
+\end{equation}
+A quantum network has a product $\bigotimes_e\rho_e$ of source states, with
+local measurements on all systems arriving at each node. A global hidden
+variable shared across sources destroys the independence assumption. The
+resulting sets are generally nonconvex; their analysis requires causal
+compatibility methods such as inflation \cite{fritz2012,wolfe2021}.
+Forgetting independence is a relaxation, never a lossless normalization.
+
+\paragraph{Trusted quantum interfaces.}
+Semiquantum games use known quantum states as questions. Substituting their
+classical preparation labels as freely readable inputs grants the players
+information they did not possess when the states were nonorthogonal. Thus
+finite labels alone do not provide a faithful Bell-game lowering. Buscemi's
+semiquantum tests witness entanglement beyond ordinary Bell tests
+\cite{buscemi2012}. Quantum answers, steering assemblages, and trusted referee
+systems similarly require operator-valued interfaces and explicit trust types.
+
+\paragraph{Multiple rounds and memory.}
+Sequential interactions need an event order, local histories, admissible
+communication, and quantum instruments or channels. A transcript table alone
+does not enforce that an early answer is independent of a future question.
+For finite-dimensional quantum interactions, strategy/comb representations
+provide positive operators with causal trace constraints
+\cite{gutoski2007}. Locality between different players remains an additional
+restriction; it is not supplied by positivity of a single global comb.
+
+The proposed umbrella IR is a typed causal process: classical or quantum wires,
+trusted or untrusted nodes, independent source factors, and a referee score.
+It can describe many finite protocols uniformly, but each backend must accept
+only a verified fragment. Continuous interfaces, infinite rounds,
+superselection rules, energy constraints, computational restrictions, and
+generalized probabilistic theories add further semantics. No claim of a
+complete finite classification is made.
+
+\begin{proposition}[No-input linear-score obstruction]
+\label{prop:noinput}
+Suppose every party has one input and every deterministic joint output is an
+admissible strategy in a resource model $\mathcal R$. Then
+\[
+ \val_{\mathcal R}(V)=\max_{a\in A}V(a).
+\]
+In particular, ordinary local and quantum models cannot be separated by such
+a game. The same value obstruction applies to independent-source networks
+when arbitrary constant outputs are permitted.
+\end{proposition}
+\begin{proof}
+Every score is a convex combination of the numbers $V(a)$, hence at most
+their maximum. The players attain the maximum by each outputting their
+component of one maximizing tuple, without using any source.
+\end{proof}
+No-input network nonlocality is nevertheless meaningful: it concerns whether
+a \emph{distribution} belongs to a nonconvex compatible set
+\cite{fritz2012}. Its detection generally needs a nonlinear distribution
+witness, constraints fixing other statistics, or several measured quantities.
+Such tests must be represented as compatibility tasks rather than misleadingly
+reported as an unrestricted scalar winning-probability advantage.

@@ -1,0 +1,85 @@
+\section{Implementation architecture and abstraction cost}
+\label{sec:architecture}
+
+\subsection{A small core with specialized analysis paths}
+The first executable fragment consists of finite one-round games with
+classical questions/answers and fixed per-party alphabet sizes. Rational
+sampling and payoff tables have exact semantics. A resource specification
+belongs to an analysis request, so the same verifier can be compared under
+several resource models. Unsupported model/backend combinations should fail
+explicitly rather than silently weaken the assumptions.
+
+The implementation separates four layers: constructors and semantic
+validation; a finite game IR and serialization; algebraic transformations;
+and analysis backends with evidence metadata. Examples exercise parity and
+consistency rules rather than serving as separate solver implementations.
+The finite table is deliberately small enough to inspect and test. Structured
+and lazy IR nodes are an extension point, not a completed optimizing compiler.
+
+Python is the initial host language because exact rationals, sparse linear
+algebra, symbolic manipulation, and convex modeling can interoperate without
+cross-language serialization during exploratory work. NumPy/SciPy handle
+numeric arrays and linear programs; SymPy supplies exact algebra; CVXPY
+provides solver-independent semidefinite modeling. Solver selection is a run
+configuration, not a mathematical resource label. Open-source solvers provide
+a portable baseline and commercial solvers can be optional.
+
+The analogy with tile-oriented GPU DSLs is useful at the design level: retain
+structure, validate contracts, and lower to specialized kernels only when
+needed. Nonlocal-game analysis has different dominant costs. Exponential
+strategy spaces and semidefinite matrix dimensions cannot be eliminated by
+removing language overhead. A GPU compiler, a new parser, or a Rust/C++ core
+should be introduced only after profiling identifies a repeated bottleneck
+and the mathematical IR is stable. Existing packages such as Inflation offer
+specialized causal-analysis functionality that can later be integrated
+through adapters \cite{boghiu2023}.
+
+\subsection{Implemented fragment versus extension roadmap}
+The initial analysis fragment covers exact deterministic local optimization,
+non-signalling linear optimization, two-party XOR semidefinite optimization,
+optional rational non-signalling primal/dual certification,
+selected bipartite moment relaxations, explicit finite-dimensional quantum
+strategy evaluation, and a symbolic CHSH certificate. Bipartite
+fixed-dimension see-saw searches are also available. Mixture, relabeling,
+and parallel-product constructors operate on the finite IR. Numerical results
+remain labeled as numerical; the exact local result and symbolic certificate
+have separate evidence mechanisms.
+
+Full NPA level generation, symmetry reduction, sparse/lazy
+compiler passes, source-network backends, trusted quantum interfaces,
+sequential combs, general extraction certificates, and finite-sample
+cryptographic analysis are future work. In particular, documenting a network
+resource does not make an ordinary Bell NPA backend a network optimizer.
+Implementation/API documentation is the authority for the exact callable
+surface; this report specifies its mathematical contract.
+
+\subsection{Costs and validation obligations}
+If the finite table has $N=|X||A|$ entries, constructing it is at least linear
+in $N$. Exact local search involves exponentially many deterministic response
+functions even with best-response elimination. A moment relaxation with $m$
+selected words stores a matrix with $m^2$ entries; generic dense cone
+operations can dominate runtime. Product constructors can multiply arena
+sizes before any solver starts. The frontend should estimate these sizes and
+permit a caller-specified budget before materialization.
+
+An efficient lowering can exploit a parity structure through
+Eq.~\eqref{eq:xor}, sparse payoff support, symmetry with a justified averaging
+argument, or repeated symbolic subexpressions. A symmetry average requires
+the feasible model to be convex and invariant; applying it indiscriminately
+to an independent-source model can invalidate source independence.
+
+Validation has two levels. Mathematical regression tests compare known exact
+benchmarks, transformation identities, and witness scores. Implementation
+tests check malformed distributions, shape mismatches, unsupported resources,
+serialization, and numerical residual reporting. Random tiny games can
+cross-check the optimized classical backend against direct enumeration, and
+independent solvers can expose numerical sensitivity. Such agreement is
+valuable evidence, but does not promote approximate SDP values to exact
+certificates.
+
+Reproducibility means declared dependencies, portable commands, public source
+citations, and generated artifacts kept outside versioned source. Run reports
+may record solver/package versions, tolerances, random seeds, and timings;
+the library should not encode a particular workstation, solver license, or
+environment path. Downloaded articles can be cached locally, while citations
+must use stable public identifiers.

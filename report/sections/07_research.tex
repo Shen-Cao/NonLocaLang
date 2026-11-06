@@ -1,0 +1,59 @@
+\section{Research program and falsifiable next steps}
+\label{sec:research}
+
+The framework's contribution at this stage is a precise separation of
+semantics, compilation contracts, and evidence types, with elementary
+preservation results. It does not yet establish a new separation theorem or
+a complete basis of all nonlocal games. The following questions would turn
+the architecture into a substantive research program.
+
+\paragraph{A useful basis of constructors.}
+Express benchmark families using parity, consistency, sampling, local wiring,
+hidden/public selection, and parallel composition. Measure description size,
+lowered size, compilation cost, and analysis cost separately. Investigate
+which additional constructors are needed for linear-system, graph-coloring,
+and synchronous games. Universality through arbitrary lookup tables is easy;
+a basis that preserves exploitable structure is the meaningful target.
+
+\paragraph{Certificates that compose.}
+Start with component value bounds and SOS relations. Use the deficit rule of
+Section~\ref{sec:composition} to track robustness under hidden mixtures, then
+identify sufficient compatibility conditions for the component extraction
+maps. A theorem should quantify the cost in score deficit, local dimension,
+and target distance. Merely adding two self-testing scores is not a proof
+that their certified subsystems coexist as a tensor product.
+
+\paragraph{Resource-aware optimization.}
+Construct pairs of arenas with identical payoff syntax but distinct source,
+dimension, or trust assumptions. Ensure that the checker rejects invalid
+backend reuse and that every accepted relaxation has the documented bound
+direction. The no-input obstruction in Proposition~\ref{prop:noinput} is a
+particularly useful test: a network compatibility problem should not be
+mistaken for an ordinary linear game-value separation.
+
+\paragraph{Certified numerical discovery.}
+Search over structured game parameters, producing a candidate strategy lower
+bound and a local upper bound for separation. Then seek a quantum upper bound
+and reconstruct an exact dual or SOS certificate. Keep candidate discovery
+and proof checking separate. Optimizing gaps over unconstrained score tables
+is ill-posed because scaling increases the gap; normalize sampling/payoff and
+control alphabet size, coefficient complexity, and physical noise assumptions.
+
+\paragraph{A staged benchmark suite.}
+CHSH tests value conventions, XOR specialization, an explicit witness, and
+an exact SOS identity. GHZ parity tests expose multipartite semantics.
+Magic-square consistency tests exercise nonbinary answer alphabets and
+perfect quantum strategies. Degenerate zero-weight questions, biased
+sampling, negative general payoffs, and no-input games test boundary cases.
+Subsequent stages should add a dimension witness, a nonlinear network
+compatibility problem, a semiquantum game, and a genuinely sequential
+protocol. Each addition should come with an explicit semantic extension and
+a demonstrably valid analysis method.
+
+\paragraph{Open design question.}
+Can a modest typed causal IR support all of these fragments while keeping
+resource-preservation proofs small and backend-specific? This is a research
+question about a useful representation, not a conjecture that every game
+admits efficient solution. Success can be measured by reuse, verified
+lowerings, smaller descriptions, and reproducible certificates even when
+many values remain unresolved.

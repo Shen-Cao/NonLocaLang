@@ -1,0 +1,162 @@
+\section{An analysis pipeline with explicit evidence types}
+\label{sec:analysis}
+
+\subsection{Values, bounds, and numerical evidence}
+An analysis result should contain its resource model, method, lower/upper
+direction, precision, feasibility diagnostics, and evidence. A floating-point
+solver status of \texttt{optimal} is not a mathematical certificate. In
+particular, the primal objective of a numerical maximization is not, by
+itself, a rigorous upper bound on the exact problem.
+
+\paragraph{Classical value.}
+Deterministic enumeration is exact for rational verifier tables. The number
+of deterministic strategy tuples is
+$D=\prod_i |A_i|^{|X_i|}$. Enumerating all but one party and computing that
+party's optimal answer separately for each question saves a factor without
+changing the optimum. This is still exponential in general. Store a maximizing
+response table and its exact rational score. A proof of optimality also needs
+the exhaustive-search argument or a separately checked dual/branch certificate.
+
+\paragraph{Non-signalling value.}
+Maximize $\langle c,p\rangle$ over positivity, normalization, and
+Eq.~\eqref{eq:ns}. This finite linear program gives an upper bound for the
+models in Eq.~\eqref{eq:chain}. Marginal constraints must include unsupported
+question tuples unless their removal has been justified. Numerical feasibility
+residuals are informative but do not replace exact dual feasibility. Rational
+reconstruction provides a separate certificate path: reconstruct primal and
+dual candidates, verify all equalities and inequalities over the rationals,
+and compare their objective values. The implementation can certify a rational
+optimum when these bounds coincide, or return the certified upper bound
+together with the verified interval when they differ. Both primal and dual
+feasibility checks must pass. Failed reconstruction is not reported as a proof.
+
+\paragraph{Quantum outer bounds.}
+The NPA hierarchy introduces moments
+$\Gamma_{u,v}=\langle u^\dagger v\rangle$ of words in measurement operators,
+requires $\Gamma\succeq0$, and imposes the algebraic identities of projectors
+and interparty commutation. Finite levels are outer relaxations. The full
+hierarchy converges to the commuting-operator set, not in general to
+$\Q_{\rm a}$ \cite{npa2008}. Thus the same finite-level bound is valid for
+finite-dimensional quantum strategies, but its interpretation must state the
+limiting model. Restricted words such as $1+A+B$ and $1+A+B+AB$ are distinct
+relaxations, not arbitrary-dimension quantum optimizers.
+The implemented level-$1$ relaxation also imposes explicit nonnegative
+probabilities, so its precise meaning is $Q_1\cap\NS$; this convention matters
+when comparing published bounds.
+
+\paragraph{XOR specialization.}
+For a two-party binary-output XOR game with winning rule
+$a\oplus b=f(x,y)$, define $C_{xy}=\mu(x,y)(-1)^{f(x,y)}$. The quantum winning
+probability is $(1+\beta_q)/2$, where
+\begin{equation}
+ \beta_q=\max_{\|u_x\|=\|v_y\|=1}\sum_{x,y}C_{xy}u_x\cdot v_y.
+ \label{eq:xor}
+\end{equation}
+The Gram formulation is a semidefinite program, with a quantum realization
+available from the vector representation \cite{cleve2004}. This is an exact
+characterization of the unrestricted two-party XOR value; a numerical solve
+remains approximate. It does not extend unchanged to arbitrary multipartite
+XOR tests or arbitrary non-XOR predicates.
+
+\paragraph{Quantum witnesses.}
+An explicit density matrix and local POVMs define a feasible strategy by
+Eq.~\eqref{eq:quantum}. Check dimensions, Hermiticity, positivity, unit trace,
+and POVM completeness before evaluating it. Floating-point checks yield a
+numerically validated witness. Symbolic exact checks or interval error bounds
+are needed for certified feasibility. Alternating optimization can search for
+witnesses in a fixed dimension, but its stationary point is a lower-bound
+candidate, not a global optimum.
+The implemented bipartite see-saw alternates a largest-eigenvector state
+update with local POVM semidefinite updates and uses seeded restarts.
+
+\subsection{Symbolic certificates: CHSH as a complete example}
+Use observables $A_0,A_1,B_0,B_1$ with $A_x^2=B_y^2=\id$ and
+$[A_x,B_y]=0$. Let
+$\mathcal B=A_0(B_0+B_1)+A_1(B_0-B_1)$. Direct expansion yields
+\begin{equation}
+ 2\sqrt2\id-\mathcal B
+ =\frac1{\sqrt2}\left[
+ \left(A_0-\frac{B_0+B_1}{\sqrt2}\right)^2+
+ \left(A_1-\frac{B_0-B_1}{\sqrt2}\right)^2\right].
+ \label{eq:chsh-sos}
+\end{equation}
+Each squared Hermitian operator is positive, proving
+$\langle\mathcal B\rangle\leq2\sqrt2$. The state
+$\ket{\Phi^+}=(\ket{00}+\ket{11})/\sqrt2$, observables $A_0=Z,A_1=X$,
+$B_0=(Z+X)/\sqrt2,B_1=(Z-X)/\sqrt2$, attain the bound. For uniform questions
+and winning rule $a\oplus b=xy$,
+\[
+ \val_{\Lset}=\tfrac34,\qquad
+ \val_{\Q_{\rm fin}}=\tfrac12+\tfrac{\sqrt2}{4},\qquad
+ \val_{\NS}=1.
+\]
+The classical bound follows because the four required parity equations have
+inconsistent XOR and three can be satisfied. The non-signalling value is
+attained by $p(a,b\mid x,y)=1/2$ when $a\oplus b=xy$, and zero otherwise.
+Equation~\eqref{eq:chsh-sos} proves the quantum upper bound independently of
+solver tolerances. SOS methods also expose the operator relations needed for
+self-testing, although extraction requires further arguments
+\cite{bamps2015}.
+
+\subsection{Metrics beyond one optimal value}
+\label{sec:benchmarks}
+The following exact literature values fix the conventions of the benchmark
+constructors. They are mathematical expectations, not a claim that every
+quantum value is certified by the implemented numerical backends.
+\begin{center}
+\begin{tabular}{lccc}
+\toprule
+Verifier and sampling & $\val_{\Lset}$ & $\val_{\Q_{\rm fin}}$ & $\val_{\NS}$\\
+\midrule
+Uniform CHSH & $3/4$ & $(2+\sqrt2)/4$ & $1$\\
+Three-party GHZ, uniform even inputs & $3/4$ & $1$ & $1$\\
+Magic square, uniform row/column & $8/9$ & $1$ & $1$\\
+Three-party GYNI, uniform even inputs & $1/4$ & $1/4$ & $1/3$\\
+\bottomrule
+\end{tabular}
+\end{center}
+GHZ requires $\sum_i a_i=\frac12\sum_i x_i\pmod2$ under the even-input
+promise; the three-party case of the parity-game analysis gives its values
+\cite{brassard2003}. Magic square uses an even row for Alice, an odd column
+for Bob, and agreement at their intersection \cite[Sec.~5]{brassard2005}.
+This is the row/column version, not the row-or-column/single-cell variant
+whose classical value is $17/18$ \cite[Sec.~3.3]{cleve2004}.
+The perfect quantum strategies imply the stated non-signalling values.
+GYNI accepts iff $(a_1,a_2,a_3)=(x_2,x_3,x_1)$. Almeida et al. prove that
+quantum resources give no advantage for any input prior, and derive the
+non-signalling value $1/3$ for this specific even-input prior
+\cite[Eqs.~(10)--(12)]{almeida2010}. GYNI therefore tests an important failure
+mode: a non-signalling gap alone does not demonstrate a quantum advantage.
+
+For normalized games, report the additive gap
+$\Delta=\val_Q-\val_L$ and the actual score conventions. Ratios are unstable
+under harmless offsets and should not be compared without a normalization.
+For a specified noise model
+$p_v=vp_*+(1-v)p_0$ with $S_G(p_*)>\val_L>S_G(p_0)$, the visibility threshold
+for violating the local bound is
+\[
+ v_{\rm crit}=\frac{\val_L-S_G(p_0)}{S_G(p_*)-S_G(p_0)}.
+\]
+This is a threshold for that family and witness, not for all noisy states or
+all possible measurements. Loss, biased inputs, misalignment, and adversarial
+noise require separate models. Conditioning on successful detection can change
+the local bound and cannot be treated as unconditional performance.
+
+Other useful questions include dimension/entanglement witnesses, nonlocal
+membership, distance to the local set, robust extraction, randomness against
+quantum side information, and sample complexity. These require different
+optimization objects and assumptions. A game-value gap alone supplies neither
+a device-independent entropy bound nor cryptographic security. Likewise,
+finite-sample significance requires a sampling and memory model, explicit
+confidence levels, and a valid statistical test; point estimates are not
+confidence bounds.
+
+\subsection{Why no complete automatic analyzer can exist}
+There are finite games whose entangled value is not attained in finite
+dimension \cite{slofstra2019}. More decisively, the gap problem distinguishing
+entangled value $1$ from value at most $1/2$ is undecidable in general
+\cite{ji2020}. A universal finite game language is therefore compatible with
+the impossibility of a uniformly terminating, complete value-analysis
+algorithm. The engineering consequence is typed partial procedures: exact
+algorithms on restricted fragments, certified bounds when available, numerical
+evidence with explicit limits, and an honest unresolved interval otherwise.

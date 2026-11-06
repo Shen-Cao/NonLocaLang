@@ -1,0 +1,81 @@
+\section{What a game specification must preserve}
+\label{sec:semantics}
+
+The standard nonlocal game is a cooperative test: a referee samples questions,
+sends each player only their own question, receives answers, and evaluates a
+score. Its meaning depends on the absence of communication during the round and
+on what resources were distributed beforehand \cite{cleve2004}. Entanglement is
+a resource that can generate Bell-nonlocal correlations; entanglement and Bell
+nonlocality are not interchangeable properties. CHSH violation certifies
+entanglement under its assumptions, but failure to violate a particular Bell
+inequality does not certify separability.
+
+\begin{definition}[Finite classical one-round verifier]
+An arena is a finite list of parties $i\in\{1,\ldots,n\}$, each with a nonempty
+question alphabet $X_i$ and answer alphabet $A_i$. Write
+$X=\prod_iX_i$ and $A=\prod_iA_i$. A verifier is a distribution
+$\mu:X\to[0,1]$ and a real payoff $V:A\times X\to\R$. A winning-probability
+verifier has $0\leq V\leq1$; a deterministic win/lose predicate takes values in
+$\{0,1\}$. A behavior is a normalized conditional distribution $p(a\mid x)$,
+and its score is
+\begin{equation}
+ S_G(p)=\sum_{x\in X}\mu(x)\sum_{a\in A}V(a,x)p(a\mid x).
+ \label{eq:score}
+\end{equation}
+The standard information rule gives player $i$ only $x_i$, with no interparty
+communication during the round. Question sampling is independent of the
+players' pre-existing resources.
+\end{definition}
+
+There is no invariant answer to ``how many fields define a game'': one may
+encode all data in a single string, infer $n$ from an alphabet list, or combine
+$\mu$ and $V$. A practical answer has five semantic components:
+\begin{enumerate}
+\item an arena with parties, interfaces, and their information/causal structure;
+\item a verifier containing sampling, acceptance/payoff, and any trusted operations;
+\item an admissible resource/strategy model $\mathcal R$;
+\item an analysis question, such as a value, membership, separation, or extraction bound;
+\item optional reference realizations and a target-equivalence specification.
+\end{enumerate}
+The first two specify the test. Adding the third defines the optimization
+problem $\val_{\mathcal R}(G)=\sup_{p\in\mathcal R}S_G(p)$. Reference states
+are not necessary to define $G$ or its value. They become essential when the
+question is whether a score certifies a particular realization. The supremum
+must not silently become a maximum.
+
+Question-dependent answer alphabets can be represented using a common padded
+alphabet only with explicit legality restrictions. Merely assigning zero payoff
+to invalid answers is unsafe for signed payoffs: an invalid answer could become
+an advantageous abort. The first implementation uses a fixed answer alphabet
+for each party. A party with no external input has $|X_i|=1$; this is a syntax
+convention, not permission to erase source-independence assumptions.
+
+\subsection{An exact core representation, with a deliberate boundary}
+Define $c_{a,x}=\mu(x)V(a,x)$. For a fixed arena,
+$S_G(p)=\langle c,p\rangle$ is an exact intermediate representation (IR) for
+linear score evaluation. Every finite classical one-round verifier has this
+representation, and a bounded table can be serialized exactly when its entries
+are rational. It does not follow that every physically meaningful experiment
+is such a verifier, or that arbitrary real parameters have finite exact
+encodings.
+
+The implementation should retain both $\mu$ and $V$ alongside $c$. Different
+sampling schemes can have the same expected linear score yet different
+estimator ranges, variances, and experimental costs. Constraints on the
+resource set also refer to the arena rather than just to coefficients. In
+particular, a question tuple with zero sampling probability still belongs to
+the arena; a non-signalling extension may impose constraints involving it.
+Dropping those questions is a separate transformation requiring justification.
+
+There are several inequivalent notions of ``the same game.'' Exact transcript
+equivalence preserves the distribution and score of each run. Score
+equivalence preserves $S_G(p)$ for every admissible $p$. Value equivalence
+preserves only an optimum for one specified resource model. A relaxation
+preserves neither behavior nor optimum, but supplies an inequality. A
+compiler pass should state which of these contracts it provides.
+
+A coefficient table costs $|X||A|$ scalar entries. A compact parity predicate
+can be exponentially smaller. The universal finite table is therefore a
+\emph{semantic fallback}, not a zero-cost implementation. Structured
+expressions---parity tests, consistency constraints, graph predicates, and
+local wirings---should survive until a backend actually needs expansion.

@@ -20,8 +20,9 @@ Compilation costs O(product_i |X_i||A_i|) entries, each an arbitrary-precision
 rational. Rule compilation and parallel product have allocation guards. Direct
 `Game` construction accepts already-materialized tables. Scenario profile properties
 materialize tuples; callers should inspect `entries` before requesting huge profiles.
-Versioned JSON preserves fractions as strings. It contains the verifier only; resource
-queries and strategy arrays are not yet serialized.
+Versioned JSON preserves fractions as strings. Separate verifier, resource/task,
+strategy, behavior, and certificate schemas retain their respective assumptions;
+numerical quantum arrays carry explicit encodings and tolerances.
 
 The coefficient lowering C[x,a] = mu[x] V[x,a] preserves every linear score. Keeping
 mu and V as well retains experimental sampling, event semantics, and promise data.
@@ -95,8 +96,9 @@ are selected through ResourceSpec; they cannot be inferred from a generic Bell f
    dual certificates. Numerical bounds need independent rigorous verification.
 3. Add sparse/factorized rule IR, symmetry actions, and reduction proof records;
    benchmark build time separately from solve time and certificate verification.
-4. Extend the implemented source-incidence witnesses and exact compatibility
-   fragments with inflation and causal protocols. Shared global randomness must
+4. Extend the implemented source-incidence witnesses, exact compatibility
+   fragments, and classical spiral inflation with higher-order/quantum inflation
+   and causal protocols. Shared global randomness must
    not erase source independence.
 5. Add target equivalence, extraction channels, and robustness certificates before
    exposing a self-testing claim API. Optimizer uniqueness is insufficient.

@@ -215,3 +215,32 @@ confidence guarantees. Primary
 sources are [Finner's inequality](https://doi.org/10.1214/aop/1176989534) and
 [network correlation constraints](https://arxiv.org/abs/1901.08287); the report gives
 explicit proofs for the implemented fragments.
+
+
+## Typed compatibility tasks and classical inflation
+
+`NetworkCompatibilityTask(behavior, resource)` separates distribution questions
+from scalar `AnalysisTask` game values. Its resource must include a source graph.
+Call `capabilities()` to inspect applicable checks, then `check(method=...)` with an
+explicit choice. Necessary-condition passes never become membership claims.
+
+The `spiral` method implements a fixed classical fanout inflation for no-input
+triangles. It can exclude the W distribution, which passes the elementary Finner
+checks. It is rejected for quantum resource tasks: classical copied-variable
+constraints are not quantum fanout constraints. See [spiral inflation](spiral-inflation.md)
+for its proof, certificates, numerical fallback states, and allocation budgets.
+
+Compatibility tasks have separate persistence helpers in
+`core.compatibility_serialization`: `compatibility_to_dict/from_dict`,
+`dump_compatibility`, and `load_compatibility`. The CLI preserves the resource scope:
+
+```sh
+python -m nonlocalgames network --file output/network-task.json --capabilities
+python -m nonlocalgames network --file output/network-task.json --method spiral --witness
+python scripts/spiral_benchmark.py > output/spiral-benchmarks.json
+```
+
+The file must contain a serialized `NetworkCompatibilityTask`. The `--time-limit`
+option is a per-LP HiGHS limit for spiral discovery. A timeout without an exactly
+verified certificate returns unresolved evidence, never a classical or quantum
+incompatibility claim. Certificate rechecking itself uses exact rational arithmetic.

@@ -1,0 +1,149 @@
+\section{A certified classical spiral-inflation fragment}
+\label{sec:spiralinflation}
+
+The triangle Finner test does not exhaust the restrictions imposed by source
+independence. A small classical inflation supplies a stronger, still tractable
+compatibility test. We use a fixed six-variable spiral construction from the
+inflation framework of Wolfe, Spekkens, and Fritz
+\cite{wolfe2019classicalinflation}; it is not a complete inflation hierarchy.
+Its resource contract is explicitly classical fanout.
+
+\subsection{Copied sources and observable marginal constraints}
+Let $U,V,W$ be independent classical sources on $AB$, $BC$, and $CA$.
+For stochastic response functions, introduce independent private randomness
+at each inflated response; it is suppressed in the following notation.
+Take independent identically distributed copies $U_1,U_2,V_1,V_2,W_1,W_2$
+and define
+\[
+\begin{array}{lll}
+ A_1=f_A(U_1,W_1),&B_1=f_B(U_1,V_1),&C_1=f_C(V_1,W_1),\\
+ A_2=f_A(U_2,W_1),&B_2=f_B(U_1,V_2),&C_2=f_C(V_1,W_2).
+\end{array}
+\]
+Every classical triangle realization therefore induces a joint distribution
+$q$ of these six outputs. The following five triple marginals of $q$ are
+fixed by the original behavior $p$:
+\begin{equation}
+\begin{aligned}
+ q_{A_1B_1C_1}(a,b,c)&=p_{ABC}(a,b,c),\\
+ q_{A_2B_2C_1}(a,b,c)&=p_{AC}(a,c)p_B(b),\\
+ q_{A_1B_2C_2}(a,b,c)&=p_{AB}(a,b)p_C(c),\\
+ q_{A_2B_1C_2}(a,b,c)&=p_{BC}(b,c)p_A(a),\\
+ q_{A_2B_2C_2}(a,b,c)&=p_A(a)p_B(b)p_C(c).
+\end{aligned}
+\label{eq:spiralmarginals}
+\end{equation}
+For example, $(A_2,C_1)$ has the original $AC$ marginal, and all its
+ancestors are disjoint from those of $B_2$. This proves the second
+factorization. The other factorizations follow from the same argument.
+The five sets are the maximal ancestrally-independent-expressible sets of
+this spiral. Their pair marginals need not be imposed separately.
+
+Fix finite output alphabet sizes $(d_A,d_B,d_C)$ and let
+$d=d_Ad_Bd_C$. Order joint assignments lexicographically as
+$(A_1,B_1,C_1,A_2,B_2,C_2)$, and order marginal rows by the five blocks in
+Eq.~\eqref{eq:spiralmarginals}, then lexicographically within each block.
+The induced marginal program is
+\begin{equation}
+ Aq=b(p),\qquad q\geq0,
+ \label{eq:spirallp}
+\end{equation}
+where $A$ is a $5d\times d^2$ integer matrix containing exactly $5d^2$
+nonzero entries, all equal to one. Each column contributes one entry to each
+marginal block. Normalization of the first block implies $\sum q=1$.
+The implementation guards these three sizes before enumerating
+assignments, and stores $A$ sparsely. For binary outputs there are 40 rows,
+64 variables, and 320 nonzeros.
+
+\begin{proposition}[Scope of the spiral marginal test]
+Every no-input classical triangle behavior makes
+Eq.~\eqref{eq:spirallp} feasible. Consequently infeasibility excludes that
+resource model. Feasibility of this program alone does not certify triangle
+compatibility.
+\end{proposition}
+\begin{proof}
+The copied-source construction produces an admissible nonnegative normalized
+$q$, and its marginals satisfy Eq.~\eqref{eq:spiralmarginals}. The converse
+would require reconstructing the source model, which the marginal LP does
+not enforce.
+\end{proof}
+The common joint distribution construction relies on classical variables
+being reusable at multiple response nodes. It does not justify copying
+quantum source systems or assuming joint outcomes for incompatible quantum
+operations. This LP therefore provides no general quantum-network
+incompatibility claim. Quantum inflation requires a different operator
+construction.
+
+\subsection{Exact infeasibility certificates}
+A candidate dual vector $y$ is a valid contradiction precisely when
+\begin{equation}
+ A^{\mathsf T}y\geq0,\qquad y^{\mathsf T}b(p)<0.
+ \label{eq:spiralfarkas}
+\end{equation}
+Indeed, a hypothetical nonnegative $q$ satisfying the marginal equations
+would give $0\leq q^{\mathsf T}A^{\mathsf T}y=y^{\mathsf T}b(p)<0$.
+Conversely, Farkas' lemma guarantees a separating vector for every infeasible
+program. Bounding the coordinates of $y$ during numerical discovery, for
+example by $|y_j|\leq1$, loses no strict separation because a Farkas vector
+can be scaled. These discovery bounds are not part of certificate validity.
+
+All input probabilities and reconstructed certificate coefficients are
+rational. Verification rebuilds $A$ and $b(p)$ and checks every inequality
+in Eq.~\eqref{eq:spiralfarkas} exactly, independently of the numerical
+solver. A useful exact repair adds $\delta=-\min(A^{\mathsf T}y)>0$ to
+every coefficient in the first marginal block whenever a candidate has
+negative dual slack. Every slack then increases by $\delta$, and the dual
+margin increases by $\delta\sum p_{ABC}=\delta$. The repaired vector is
+retained only if its final exact margin is still negative.
+
+A numerically reported infeasibility without a verified dual is not an
+exact exclusion. A rational primal $q$ satisfying the equations certifies
+only feasibility of the relaxation, so its compatibility status remains
+\emph{not ruled out}. Numerical failures, missing or malformed witnesses, and unsuccessful
+rational reconstruction retain an explicit unresolved status or numerical
+evidence label. Numerical feasibility additionally requires checked residuals;
+solver option values that would be silently reset are rejected.
+
+\subsection{A W-type benchmark beyond the Finner checks}
+For binary outputs, the event inclusion on the six inflated variables gives
+\begin{equation}
+ p_A(1)p_B(1)p_C(1)\leq p_{ABC}(000)
+ +p_{AC}(11)p_B(1)+p_{AB}(11)p_C(1)+p_{BC}(11)p_A(1).
+ \label{eq:spiralw}
+\end{equation}
+To see the inclusion, if all three outer variables are one, either all
+inner variables are zero, or at least one of $A_1,B_1,C_1$ is one. The
+latter possibilities lie in the corresponding expressible triple events
+on the right. Taking probabilities and applying
+Eq.~\eqref{eq:spiralmarginals} proves the inequality.
+
+The distribution $p(100)=p(010)=p(001)=1/3$ has a zero right-hand side and
+left-hand side $1/27$. This provides a simple integer dual certificate:
+in the stated zero-based row order, set $y_0=y_{15}=y_{23}=y_{31}=1$,
+$y_{39}=-1$, and every other coefficient to zero. Direct checking gives
+$\min(A^{\mathsf T}y)=0$ and $y^{\mathsf T}b=-1/27$.
+Meanwhile every nonzero event passes the triangle Finner test, since
+$(1/3)^2\leq(1/3)(2/3)(2/3)$. The benchmark thus exercises
+stronger classical compatibility information without changing its evidence
+scope. It is an incompatibility target, not a demonstrated quantum advantage:
+no quantum realization of this target is supplied by this example.
+
+\subsection{A polynomial witness, not a linear Bell functional}
+For fixed output alphabets, $A$ is independent of the tested distribution.
+An exactly verified $A^{\mathsf T}y\geq0$ therefore defines the universal
+classical-triangle inequality $\Phi_y(p)=y^{\mathsf T}b(p)\geq0$.
+Choosing $y$ by optimizing against one distribution does not invalidate
+this statement once structural dual feasibility has been independently
+checked. However, $b(p)$ contains linear, quadratic, and cubic terms in the
+original probabilities. The witness is linear in the lifted marginal
+coordinates, but is generally a polynomial in $p$, not an ordinary Bell
+score.
+
+Exported numerical-discovery records bind the complete behavior,
+source graph, output alphabets, and row-order schema through canonical
+fingerprints. Checking the same coefficient vector on different data must
+explicitly rebuild and evaluate $b(p)$ in the new context. If a future
+relaxation introduces distribution-dependent coefficients in $A$ itself,
+the preceding universal-polynomial interpretation requires a new proof;
+a single-instance dual cannot then be reused without checking the changed
+constraints.

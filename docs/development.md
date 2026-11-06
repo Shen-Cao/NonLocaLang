@@ -21,6 +21,10 @@ optional cross-checks. Do not infer a verified certificate from a solver status,
 small residual, or agreement between solvers. Tests use tolerances only for
 numerical claims; exact fractions and algebraic identities compare exactly.
 
+Regression tests are grouped under `tests/core`, `tests/analysis`,
+`tests/certificates`, `tests/classical`, `tests/quantum`, `tests/networks`, and
+`tests/cli`; pytest discovers these recursively.
+
 Keep mathematical modules focused: verifier data, resource semantics, transforms,
 analysis, and strategy witnesses have separate modules. New dialects need explicit
 capability checks and a counterexample test for any tempting but invalid lowering.

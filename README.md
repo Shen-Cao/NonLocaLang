@@ -60,6 +60,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |
 | Independent-source networks | Exact classical / numerical quantum source factorization | Constructive witnesses and tensor-order checks |
 | Network compatibility | Source-disjoint marginals, triangle Finner, bilocal inequality | Exact rational necessary tests; passing is generally inconclusive |
+| Classical spiral inflation | No-input triangle, finite outputs | Exact Farkas exclusion or explicitly inconclusive relaxation feasibility |
 | No-input bilocal reconstruction | Arbitrary finite output alphabets on a three-party chain | Exact membership decision and constructive source model |
 | CHSH symbolic checker | Canonical CHSH involution algebra | Exact SOS bound and attaining realization |
 
@@ -78,6 +79,7 @@ python scripts/search_xor.py --steps 20 > output/xor-search.json
 python scripts/resource_benchmark.py > output/resources.json
 python scripts/network_benchmark.py > output/networks.json
 python scripts/network_compatibility.py > output/network-compatibility.json
+python scripts/spiral_benchmark.py > output/spiral-benchmarks.json
 bash scripts/build_report.sh
 ```
 

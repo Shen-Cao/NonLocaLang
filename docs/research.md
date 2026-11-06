@@ -71,19 +71,18 @@ to build or use the tracked project.
    synchronous-game families. Compare symbolic description size, table size,
    compilation time, and backend cost. A tiny predicate can expand into an
    enormous table; retain it when a specialized solver can consume it.
-2. **Independent certificate checking.** Extend the rational non-signalling
-   LP certificate and symbolic CHSH certificate to SDP duals and more general
+2. **Broader independent certificates.** Extend the rational non-signalling
+   LP, network-violation, and symbolic CHSH checkers to SDP duals and more general
    SOS decompositions, then verify them with exact or interval arithmetic.
    Keep the discovery process outside the trusted checker.
 3. **Composition of rigidity.** Establish conditions under which saturation
    relations from component games admit compatible local extraction maps.
    Track how mixture weights and dimension costs affect robustness.
-4. **Independent-source compatibility.** Extend the implemented source
-   hypergraphs, exact classical and numerical quantum witness evaluators, and
+4. **General independent-source compatibility.** Add an Inflation adapter
+   and broader compatibility methods beyond the implemented source witnesses,
    bilocal/triangle inequalities, source-disjoint marginal checks, and exact
-   no-input chain reconstruction with an Inflation adapter and general
-   compatibility tasks. Keep global shared randomness explicit; ordinary Bell backends must
-   not replace the independent-source constraints.
+   no-input chain reconstruction. Keep global shared randomness explicit;
+   ordinary Bell backends must not replace source-independence constraints.
 5. **Trusted and sequential interfaces.** Add semiquantum states and causal
    channels as typed objects. Demonstrate a faithful lowering on one restricted
    example before generalizing.
@@ -94,9 +93,9 @@ to build or use the tracked project.
 The resource extension also proves that external convexification preserves
 linear values, gives an exact product-resource value reduction when no
 numerically supplied state is involved, and distinguishes fixed-measurement
-PPT optima from the global quantum value. For unrestricted local response functions, every classical network has the
-ordinary local polytope as its convex hull and thus the same linear game
-values; this does not identify their compatibility sets. The bilocal
+PPT optima from the global quantum value. For unrestricted local response
+functions, every classical network has the ordinary local polytope as its convex
+hull and thus the same linear game values; this does not identify their compatibility sets. The bilocal
 regression shows that global shared randomness can invalidate a nonlinear
 network constraint.
 

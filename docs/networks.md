@@ -12,7 +12,11 @@ optimization therefore have separate guarantees.
 there is no additional global shared variable. Source order and endpoint order are
 preserved because they determine quantum tensor-factor ordering. Repeated recipient
 sets represent separate independent sources. Isolated parties and an empty source
-list are permitted.
+list are permitted. In a quantum witness, each party's POVM dimension equals
+the product of its incident source-factor dimensions. A unary source such as
+`(0,)` supplies an explicit independent local ancilla and counts toward that
+party's dimension bound. An isolated party has dimension one. A projective
+measurement contract never introduces an implicit dilation.
 
 `ClassicalNetworkStrategy` stores one rational latent-variable distribution per
 source and one local rational conditional-response table per party. Its rule builder
@@ -144,8 +148,9 @@ from fractions import Fraction
 from nonlocalgames import Scenario
 from nonlocalgames.networks import SourceNetwork
 from nonlocalgames.networks.behavior import RationalBehavior
-from nonlocalgames.networks.compatibility import (
-    check_source_independence, triangle_finner,
+from nonlocalgames.networks import (
+    check_source_independence, triangle_finner, verify_compatibility_violation,
+    violation_to_dict,
 )
 from nonlocalgames.networks.membership import reconstruct_bilocal_chain
 
@@ -168,7 +173,13 @@ common_bit = RationalBehavior(scenario, tuple(
     for a, b, c in scenario.outputs
 ))
 assert check_source_independence(chain, common_bit).status == "incompatible"
-assert triangle_finner(triangle, common_bit).status == "incompatible"
+excluded = triangle_finner(triangle, common_bit)
+assert excluded.status == "incompatible"
+saved_violation = violation_to_dict(excluded.violation)
+rechecked = verify_compatibility_violation(
+    triangle, common_bit, excluded.method, saved_violation,
+)
+assert rechecked.status == "incompatible"
 ```
 
 `check_source_independence(network, behavior)` checks all source-disjoint nonempty
@@ -179,6 +190,13 @@ exactly one pair source on every edge of a three-party triangle. Both methods
 return `incompatible` with an exact event/marginal violation, or `not_ruled_out`.
 A triangle has no source-disjoint party pairs, so the independence checker may
 perform zero checks; that is correctly inconclusive rather than compatibility.
+
+`violation_to_dict/from_dict` use exact rational strings in a versioned certificate.
+`verify_compatibility_violation` rechecks the named input/event and applicability
+conditions without searching over all checks. It rejects altered values, an invalid
+relation, or a certificate that does not actually violate the necessary condition.
+`behavior_to_dict/from_dict` in `networks.behavior_serialization` separately serialize the full
+rational behavior used to verify that certificate.
 
 `reconstruct_bilocal_chain(network, behavior)` returns `compatible` with a rational
 `ClassicalNetworkStrategy`, or `incompatible` with an exact marginal violation.

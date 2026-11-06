@@ -121,8 +121,10 @@ variable distribution for each source. In a quantum witness, the global
 source state is constructed as $\bigotimes_e\rho_e$. Its factors are then
 permuted into party order before local joint POVMs are applied. Source order,
 endpoint order, and the resulting party-local factor order are part of the
-representation. Accepting an arbitrary global density matrix in place of
-these factors would discard independence.
+representation. Each local POVM dimension equals the product of the incoming
+factor dimensions. A unary source can supply an explicit independent local
+ancilla; no projective dilation is added implicitly. Accepting an arbitrary
+global density matrix in place of these factors would discard independence.
 
 A classical finite-source witness similarly uses an explicit product of
 rational latent-variable distributions and rational local response tables.
@@ -207,7 +209,7 @@ flattening does not justify using an unrestricted optimizer as a network
 optimizer.
 
 Dimension-sensitive global bounds, generic separability or entanglement-depth
-constraints, network optimization and inflation adapters, trusted quantum
+constraints, global quantum network optimization and inflation adapters, trusted quantum
 questions, and sequential instruments require further backends. The resource
 schema makes these extension points explicit without asserting that a single
 solver can handle them all.

@@ -3,3 +3,7 @@ from .resources import (AnalysisTask, MeasurementClass, Resource, ResourceSpec,
                         SharedRandomness, StateConstraint)
 
 __all__ = ["Game", "Scenario", "AnalysisTask", "Resource", "ResourceSpec", "SharedRandomness", "StateConstraint", "MeasurementClass"]
+
+from .compatibility_tasks import NetworkCompatibilityTask
+
+__all__ += ["NetworkCompatibilityTask"]

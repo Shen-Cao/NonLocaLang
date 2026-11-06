@@ -39,11 +39,14 @@ def result_record(result, include_witness=False):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "network":
+        from .network_cli import main as network_main
+        return network_main(argv[1:])
     if argv and argv[0] == "task":
         from .task_cli import main as task_main
         return task_main(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__,
-                                     epilog="Resource tasks: nonlocalgames task --help")
+                                     epilog="Resource tasks: nonlocalgames task --help; behavior checks: nonlocalgames network --help")
     parser.add_argument("game", choices=tuple(GAMES) + ("json",))
     parser.add_argument("--file", help="versioned verifier JSON, required for game=json")
     parser.add_argument("--method", choices=("local", "ns", "ns-exact", "npa1", "npa1ab", "xor", "xor-certified"),

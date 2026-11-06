@@ -23,8 +23,7 @@ def _readonly_matrix(value: object) -> np.ndarray:
         raise ValueError("State and measurement effects must be square matrices.")
     if matrix.shape[0] == 0 or not np.isfinite(matrix).all():
         raise ValueError("Matrices must be nonempty and finite.")
-    matrix.setflags(write=False)
-    return matrix
+    return np.frombuffer(matrix.tobytes(), dtype=complex).reshape(matrix.shape)
 
 
 @dataclass(frozen=True, eq=False)
@@ -33,7 +32,7 @@ class QuantumStrategy:
 
     Local dimensions are inferred from each party's effects. The density matrix
     uses the tensor-factor order of the parties. Arrays are defensively copied
-    and read-only; all validation uses absolute ``tolerance``.
+    and backed by immutable bytes; all validation uses absolute ``tolerance``.
     """
 
     state: np.ndarray
@@ -42,7 +41,7 @@ class QuantumStrategy:
     dimensions: tuple[int, ...] = field(init=False)
 
     def __post_init__(self) -> None:
-        if not np.isfinite(self.tolerance) or self.tolerance <= 0:
+        if isinstance(self.tolerance, (bool, np.bool_)) or not np.isfinite(self.tolerance) or self.tolerance <= 0:
             raise ValueError("tolerance must be positive and finite.")
         state = _readonly_matrix(self.state)
         measurements = tuple(

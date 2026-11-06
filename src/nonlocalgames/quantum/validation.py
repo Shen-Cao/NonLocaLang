@@ -1,4 +1,7 @@
 """Check a concrete quantum strategy against a composable resource contract."""
+from math import prod
+from numbers import Integral
+
 import numpy as np
 
 from ..core.resources import MeasurementClass, Resource, StateConstraint
@@ -30,6 +33,7 @@ def validate_strategy(task, strategy):
         if residual > r.fixed_state.tolerance:
             raise ValueError("Strategy does not use the declared fixed state")
         diagnostics["fixed_state_residual"] = residual
+        diagnostics["fixed_state_tolerance"] = r.fixed_state.tolerance
     diagnostics.update(state_diagnostics(strategy.state, strategy.dimensions,
                                          tolerance=tolerance, ppt_cuts=r.ppt_cuts))
     if r.state_constraint == StateConstraint.PRODUCT:
@@ -54,3 +58,24 @@ def evaluate(task, strategy):
     return AnalysisResult(strategy.score(task.game), task.resource.kind.value,
                           "restricted_strategy_evaluation", "numerical_witness", "validated",
                           diagnostics, strategy)
+
+
+def validate_measurements(task, measurements, *, tolerance=1e-7, max_joint_dimension=256):
+    """Fail before optimization if supplied POVMs violate interface or resource bounds."""
+    if (isinstance(max_joint_dimension, bool) or not isinstance(max_joint_dimension, Integral)
+            or max_joint_dimension < 1):
+        raise ValueError("max_joint_dimension must be a positive integer")
+    measurements = tuple(tuple(tuple(povm) for povm in party) for party in measurements)
+    if not measurements or any(not p or any(not povm for povm in p) for p in measurements):
+        raise ValueError("Measurements need nonempty parties, settings, and outcomes")
+    try:
+        dimensions = tuple(np.asarray(p[0][0]).shape[0] for p in measurements)
+    except IndexError as error:
+        raise ValueError("Measurement effects must be matrices") from error
+    size = prod(dimensions)
+    if size < 1 or size > max_joint_dimension:
+        raise ValueError("Measurement dimension is zero or exceeds max_joint_dimension")
+    state = np.eye(size) / size
+    reference = QuantumStrategy(state, measurements, tolerance)
+    validate_strategy(task, reference)
+    return reference.measurements

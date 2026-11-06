@@ -169,3 +169,43 @@ script independently computes local and NS values; CHSH additionally exercises
 NPA, XOR, the strategy evaluator, and the symbolic certificate. The optional
 magic-square SDP is a larger outer relaxation. GYNI demonstrates that a
 nonsignalling gap alone need not imply a quantum gap.
+
+## Restricted quantum tasks
+
+`ResourceSpec` now composes dimension bounds, fixed states, state-family
+constraints, external shared randomness, and measurement classes. See
+[resource contracts](contracts.md) for semantics. Quantum searches remain
+explicit, and their results are `numerical_witness` evidence:
+
+```python
+from nonlocalgames import AnalysisTask, ResourceSpec
+from nonlocalgames.games import chsh
+from nonlocalgames.quantum import FixedState, chsh_strategy
+
+reference = chsh_strategy()
+resource = ResourceSpec("quantum_finite", local_dimensions=(2, 2),
+                        fixed_state=FixedState(reference.state, (2, 2)))
+result = AnalysisTask(chsh(), resource).solve(
+    method="seesaw", seed=7, restarts=2, max_iterations=15,
+    solver="SCS", solver_options={"eps": 1e-8})
+```
+
+`state_constraint="ppt", ppt_cuts=((0,),)` restricts the state across the stated
+bipartition. Both see-saw state updates and the separate `state_sdp` method
+preserve the restriction. A `state_sdp` query requires supplied `measurements`
+and optimizes only the state; its optimum is not an upper bound on a game where
+measurements can also vary. For canonical CHSH measurements, the two-qubit PPT
+state block gives approximately 0.676777, whereas optimizing both measurements
+and PPT states can reach 0.75. Tests distinguish these two claims.
+
+Fixed states never change during search. Dimension bounds are checked against
+the actual fixed-state factors. Projective-only searches are rejected by the
+POVM see-saw, while `state_sdp` can accept supplied projective measurements after
+checking them. Every returned strategy is rechecked against the task contract.
+PPT repairs mix with the identity to restore all required positivity constraints;
+raw objectives and recomputed witness scores remain separate. A direct low-level
+`optimize_state` result exposes both as `.objective` and `.value`.
+
+Run `python scripts/resource_benchmark.py` to compare restrictions using declared
+solver settings and initialization seed. The script reports exact local/product
+values alongside explicitly numerical quantum witnesses.

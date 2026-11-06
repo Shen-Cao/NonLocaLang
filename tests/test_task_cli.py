@@ -108,3 +108,18 @@ def test_task_routes_through_main_command_and_omits_witness_by_default(tmp_path,
     record = json.loads(capsys.readouterr().out)
     assert record["result"]["value"] == "3/4"
     assert "witness" not in record["result"]
+
+
+def test_task_cli_certified_xor_keeps_upper_evidence(tmp_path, capsys):
+    from nonlocalgames.core.resource_serialization import dump_task
+    from nonlocalgames import AnalysisTask, ResourceSpec
+    from nonlocalgames.games import chsh
+    from nonlocalgames.analysis import verify_xor_certificate
+    from nonlocalgames.task_cli import main
+    path = tmp_path / 'xor.json'
+    dump_task(AnalysisTask(chsh(), ResourceSpec('quantum_finite')), path)
+    main(['--file', str(path), '--method', 'xor_certified', '--witness'])
+    record = json.loads(capsys.readouterr().out)
+    result = record['result']
+    assert result['guarantee'] == 'certified_upper_bound'
+    assert str(verify_xor_certificate(chsh(), result['witness']).value) == result['value']

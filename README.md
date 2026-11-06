@@ -54,7 +54,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |
-| XOR SDP | Bipartite binary outputs, parity-only reward | Numerical evaluation of an exact characterization |
+| XOR SDP and certificate | Bipartite binary outputs, parity-only sampled rewards | Numerical optimum; independently verified rational dual upper bounds |
 | Quantum strategy evaluator | Finite tensor-product state and POVMs | Numerically validated witness and score |
 | Restricted quantum search | Multipartite dimensions, fixed/PPT states; POVMs or binary projectors | Seeded heuristic; restrictions rechecked on witnesses |
 | Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |

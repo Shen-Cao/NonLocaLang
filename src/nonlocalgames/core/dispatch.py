@@ -23,10 +23,11 @@ def capabilities(task):
     if s.parties == 2 and unrestricted:
         methods.append("npa")
         if s.output_sizes == (2, 2) and all(
-            task.game.reward(x, (0, 0)) == task.game.reward(x, (1, 1))
-            and task.game.reward(x, (0, 1)) == task.game.reward(x, (1, 0)) for x in s.inputs
+            task.game.probability(x) == 0 or (
+                task.game.reward(x, (0, 0)) == task.game.reward(x, (1, 1))
+                and task.game.reward(x, (0, 1)) == task.game.reward(x, (1, 0))) for x in s.inputs
         ):
-            methods.append("xor")
+            methods.extend(("xor", "xor_certified"))
     if r.kind == Resource.QUANTUM_FINITE:
         measurement_supported = (r.measurement_class == MeasurementClass.POVM or
                                  all(a <= 2 for a in s.output_sizes))
@@ -39,7 +40,7 @@ def capabilities(task):
 
 def solve(task, method, options):
     from ..analysis import (AnalysisResult, certify_nonsignalling, classical_value,
-                            nonsignalling_value, npa_bound, xor_quantum_value)
+                            nonsignalling_value, npa_bound, xor_quantum_value, certify_xor_upper_bound)
     r = task.resource
     if method is None:
         if r.kind == Resource.LOCAL or (r.state_constraint == StateConstraint.PRODUCT and r.fixed_state is None):
@@ -76,8 +77,9 @@ def solve(task, method, options):
         return nonsignalling_value(task.game, **options)
     if method == "ns_exact":
         return certify_nonsignalling(task.game, **options)
-    if method in ("npa", "xor"):
-        result = (npa_bound if method == "npa" else xor_quantum_value)(task.game, **options)
+    if method in ("npa", "xor", "xor_certified"):
+        backend = {"npa": npa_bound, "xor": xor_quantum_value, "xor_certified": certify_xor_upper_bound}[method]
+        result = backend(task.game, **options)
         return replace(result, diagnostics={**result.diagnostics, "requested_resource": r.kind.value})
     from ..quantum.validation import validate_strategy
     if method == "seesaw":

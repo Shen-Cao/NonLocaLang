@@ -51,3 +51,15 @@ def test_main_routes_serialized_resource_tasks(tmp_path, capsys):
     result = json.loads(capsys.readouterr().out)
     assert result['result']['value'] == '3/4'
     assert result['resource']['shared_randomness'] == 'forbidden'
+
+
+def test_cli_certified_xor_bound_can_be_reverified(capsys):
+    from fractions import Fraction
+    from nonlocalgames.analysis import verify_xor_certificate
+    from nonlocalgames.games import chsh
+    main(['chsh', '--method', 'xor-certified', '--witness'])
+    record = json.loads(capsys.readouterr().out)['result']
+    checked = verify_xor_certificate(chsh(), record['witness'])
+    assert record['guarantee'] == 'certified_upper_bound'
+    assert checked.value == Fraction(record['value'])
+    assert (checked.value - Fraction(1, 2))**2 >= Fraction(1, 8)

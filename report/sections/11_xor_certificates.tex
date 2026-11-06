@@ -1,0 +1,65 @@
+\section{Exact upper certificates for XOR games}
+\label{sec:xorcertificates}
+
+For a bipartite binary-output parity score, let $e_{xy}$ and $o_{xy}$ be its
+even- and odd-parity rewards. Define the rational constant and weight matrix
+\[
+ c_0=\sum_{xy}\mu(x,y)\frac{e_{xy}+o_{xy}}2,
+ \qquad W_{xy}=\mu(x,y)\frac{e_{xy}-o_{xy}}2,
+ \qquad C=\begin{pmatrix}0&W/2\\W^T/2&0\end{pmatrix}.
+\]
+The vector characterization discussed in Section~\ref{sec:analysis} has primal
+objective $c_0+\langle C,G\rangle$, subject to $G\succeq0$ and
+$G_{ii}=1$. The off-diagonal factor $1/2$ in $C$ avoids counting each cross
+correlator twice. The usual SDP solve is numerical. Its equality dual can
+instead seed an independently checked rational certificate.
+
+\begin{proposition}[XOR dual certificate]
+Let $z$ be a rational vector and suppose the rational symmetric matrix
+$S=\operatorname{Diag}(z)-C$ is positive semidefinite. Then
+\[
+ \val_{\Q_{\rm fin}}(G)\leq c_0+\sum_i z_i.
+\]
+The same bound applies to commuting strategies for this bipartite XOR fragment.
+\end{proposition}
+\begin{proof}
+For every feasible Gram matrix, positivity gives
+$\langle S,G\rangle\geq0$. Since its diagonal is one,
+$\langle C,G\rangle\leq\sum_i z_i$. The XOR vector characterization
+includes the relevant correlations \cite{cleve2004}.
+\end{proof}
+This proof uses only feasibility of the supplied dual; an optimal numerical
+status is neither required nor sufficient. Signed rewards, biased sampling,
+and zero-probability questions are handled by the same rational formulas.
+
+\subsection{An exact PSD checker}
+A symmetric rational matrix can be checked by successive Schur complements.
+A negative diagonal pivot disproves positivity. A zero pivot requires every
+remaining entry in that pivot's row to be zero: otherwise the corresponding
+$2\times2$ principal minor has negative determinant. A positive pivot $d$
+reduces the problem to the remaining matrix minus $vv^T/d$. These steps are
+necessary and sufficient, so exact rational arithmetic handles singular
+matrices as well as positive definite ones. No floating eigenvalue or tolerance
+enters certificate verification. Matrix-size budgets limit rational elimination
+cost; they do not weaken the checked condition.
+
+\subsection{Repairing numerical candidates}
+Round a numerical dual into rationals and first test its slack exactly. If
+necessary, increase every diagonal coordinate by the same rational amount.
+The choice
+\[
+ \delta=\max\left(0,\max_i\left[\sum_{j\ne i}|C_{ij}|-z_i\right]\right)
+\]
+gives a symmetric diagonally dominant slack with nonnegative diagonal and
+therefore a guaranteed feasible endpoint. A fixed number of rational bisection
+steps, each using the exact PSD checker, can reduce this repair while retaining
+a feasible upper endpoint. The resulting objective increases by
+$(|X_A|+|X_B|)\delta$ for the retained shift; this cost is reported explicitly.
+
+The resulting value is a certified upper bound, not necessarily the optimum.
+A numerical Gram matrix does not supply a certified lower bound. One may
+separately compare with an exact classical strategy or an independently verified
+quantum realization. Serialized certificates bind to the canonical verifier
+and store rational diagonals and the claimed bound. Rechecking recomputes the
+matrix, positivity, and bound from the supplied game, independently of the
+original solver and its tolerances.

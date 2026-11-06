@@ -95,7 +95,8 @@ certificates. Solver failures raise; `optimal_inaccurate` remains visibly marked
 No computed value is clipped to the physical interval.
 
 The XOR checker requires the reward to depend only on answer parity at every
-input, including unused inputs. Its witness is a Gram matrix, not an extracted
+positive-probability input. Unused questions remain in the Gram model, but their
+zero-weight reward entries need not satisfy parity symmetry. Its witness is a Gram matrix, not an extracted
 state and collection of POVMs.
 
 ### Explicit quantum witnesses and symbolic CHSH
@@ -224,3 +225,32 @@ a typed version with exact behavior generation, and
 `classical.deterministic_quantum_strategy` embeds the tables using one-dimensional
 product states and identity/zero projectors. Prescribed numerical fixed states
 are not silently replaced by that embedding.
+
+
+## Certified XOR quantum upper bounds
+
+`certify_xor_upper_bound(game, solver="SCS", eps=1e-8)` discovers a dual diagonal,
+reconstructs rational entries, and verifies the dual slack with exact Schur
+elimination. When rounding loses positivity, a rational diagonal shift restores
+it; diagnostics record the shift and resulting objective increase. The returned
+`certified_upper_bound` is a Fraction. The numerical primal objective is kept as
+diagnostic evidence and is never used as a certified lower bound.
+
+`verify_xor_dual(game, diagonal)` checks a supplied exact diagonal without solving
+an SDP. `verify_xor_certificate(game, result.witness)` independently checks the
+serialized fingerprint, diagonal, PSD condition, and claimed bound. Certificate
+checking rejects floats and tampered verifier data. The canonical fingerprint
+excludes only the descriptive game name.
+
+```sh
+python -m nonlocalgames chsh --method xor-certified --witness
+python -m nonlocalgames task --file output/unrestricted-xor-task.json --method xor_certified --witness
+```
+
+The task method requires an unrestricted bipartite XOR quantum resource contract.
+It does not silently drop fixed states, dimensions, measurements, or source
+restrictions. A raw unrestricted bound may mathematically apply to subsets, but
+that is a separate relaxation claim. Discovery failure remains an error, not an
+implicit solver switch. Matrix-size and rational-reconstruction budgets are
+configurable through the Python API. Exact rational checking can be expensive
+for large matrices or large coefficient bit lengths.

@@ -175,3 +175,11 @@ status, and optional witness. Ordinary quantum witnesses use
 source factors through the network schemas. Re-import a witness and call the
 original task's `evaluate` method to check it against the original restrictions.
 Serialization preserves numerical data and tolerances; it adds no proof guarantee.
+
+Numerical resource loading rejects Boolean or string matrix entries and checks
+budgets before allocating or eigendecomposing matrices. `resource_from_dict` and
+`task_from_dict` accept `max_joint_dimension` and `max_matrix_entries`; `load_task`
+also limits JSON bytes with `max_file_bytes`. Quantum-network decoding checks the
+product source dimension and aggregate source/global/POVM entry count through
+`max_total_dimension` and `max_matrix_entries`. Limits are configurable and failure
+never silently truncates a state, drops a source, or changes a resource contract.

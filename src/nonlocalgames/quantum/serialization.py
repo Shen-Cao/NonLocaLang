@@ -2,7 +2,7 @@
 from math import prod
 from numbers import Integral
 
-import numpy as np
+from ..core.numeric_data import matrix_from_dict as _matrix_from_dict
 
 from .states import validate_dimensions
 from .strategy import QuantumStrategy
@@ -12,24 +12,6 @@ STRATEGY_SCHEMA = "nonlocalgames.quantum_strategy.v1"
 
 def _matrix_to_dict(matrix):
     return {"real": matrix.real.tolist(), "imag": matrix.imag.tolist()}
-
-
-def _matrix_from_dict(data, dimension):
-    if not isinstance(data, dict) or set(data) != {"real", "imag"}:
-        raise ValueError("Numerical matrices require exactly real and imag fields")
-    for part in (data["real"], data["imag"]):
-        if (not isinstance(part, list) or len(part) != dimension
-                or any(not isinstance(row, list) or len(row) != dimension for row in part)):
-            raise ValueError("Matrix data does not match the declared square dimension")
-        if any(isinstance(v, bool) or not isinstance(v, (int, float)) for row in part for v in row):
-            raise ValueError("Numerical matrix entries must be real JSON numbers")
-    try:
-        real, imag = np.asarray(data["real"], dtype=float), np.asarray(data["imag"], dtype=float)
-    except (TypeError, ValueError, OverflowError) as error:
-        raise ValueError("Matrix entries must be representable as float64") from error
-    if not np.isfinite(real).all() or not np.isfinite(imag).all():
-        raise ValueError("Numerical matrices must contain only finite numbers")
-    return real + 1j * imag
 
 
 def strategy_to_dict(strategy):

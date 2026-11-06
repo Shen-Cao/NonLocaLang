@@ -1,5 +1,8 @@
 """Versioned network structure and witness data; no executable payloads."""
-import numpy as np
+from math import prod
+
+from ..core.numeric_data import matrix_from_dict, positive_budget
+from ..quantum.states import validate_dimensions
 
 from ..core.game import Scenario
 from .classical import ClassicalNetworkStrategy
@@ -57,38 +60,49 @@ def _matrix_to_dict(matrix):
     return {"real": matrix.real.tolist(), "imag": matrix.imag.tolist()}
 
 
-def _matrix_from_dict(data):
-    _fields(data, {"real", "imag"})
-    real, imag = np.asarray(data["real"], dtype=float), np.asarray(data["imag"], dtype=float)
-    if real.shape != imag.shape or real.ndim != 2:
-        raise ValueError("Real and imaginary matrix parts must have identical matrix shapes")
-    return real + 1j * imag
-
-
 def quantum_to_dict(strategy):
     return {"schema": QUANTUM_SCHEMA, "encoding": "complex_float64",
-            "network": network_to_dict(strategy.network), "tolerance": strategy.tolerance,
-            "sources": [{"dimensions": list(s.dimensions), "tolerance": s.tolerance,
+            "network": network_to_dict(strategy.network), "tolerance": float(strategy.tolerance),
+            "sources": [{"dimensions": list(s.dimensions), "tolerance": float(s.tolerance),
                          "state": _matrix_to_dict(s.state)} for s in strategy.sources],
             "measurements": [[[_matrix_to_dict(effect) for effect in povm] for povm in party]
                              for party in strategy.measurements]}
 
 
-def quantum_from_dict(data, *, max_total_dimension=1024):
-    """Reconstruct and numerically revalidate every source and local POVM."""
+def quantum_from_dict(data, *, max_total_dimension=1024, max_matrix_entries=1_000_000):
+    """Check aggregate budgets before decoding/eigendecomposing any source matrix."""
+    positive_budget(max_total_dimension, "max_total_dimension")
+    positive_budget(max_matrix_entries, "max_matrix_entries")
     _fields(data, {"schema", "encoding", "network", "tolerance", "sources", "measurements"}, QUANTUM_SCHEMA)
     if data["encoding"] != "complex_float64":
         raise ValueError("Unsupported quantum network numerical encoding")
     if not isinstance(data["sources"], list) or not isinstance(data["measurements"], list):
         raise ValueError("Sources and measurements must be lists")
-    sources = []
-    for source in data["sources"]:
+    network = network_from_dict(data["network"])
+    if len(data["sources"]) != len(network.sources):
+        raise ValueError("Provide one source per network source")
+    dimensions = []
+    for source, endpoints in zip(data["sources"], network.sources):
         _fields(source, {"dimensions", "tolerance", "state"})
-        sources.append(QuantumSource(_matrix_from_dict(source["state"]), source["dimensions"], source["tolerance"]))
-    measurements = []
-    for party in data["measurements"]:
-        if not isinstance(party, list) or any(not isinstance(povm, list) for povm in party):
-            raise ValueError("Measurements must be nested party/input/outcome lists")
-        measurements.append(tuple(tuple(_matrix_from_dict(effect) for effect in povm) for povm in party))
-    return QuantumNetworkStrategy(network_from_dict(data["network"]), sources, measurements,
-                                  data["tolerance"], max_total_dimension)
+        dims = validate_dimensions(source["dimensions"])
+        if len(dims) != len(endpoints):
+            raise ValueError("Source dimensions do not match endpoint factors")
+        dimensions.append(dims)
+    size = prod(prod(dims) for dims in dimensions)
+    if size > max_total_dimension:
+        raise ValueError("Product source dimension exceeds max_total_dimension")
+    local_dims = tuple(prod(dimensions[s][e] for s, e in ports) for ports in network.party_ports)
+    if len(data["measurements"]) != network.parties:
+        raise ValueError("Provide one measurement collection per party")
+    entries = size * size + sum(prod(dims)**2 for dims in dimensions)
+    for party, dim in zip(data["measurements"], local_dims):
+        if not isinstance(party, list) or not party or any(not isinstance(p, list) or not p for p in party):
+            raise ValueError("Measurements must be nonempty nested party/input/outcome lists")
+        entries += sum(len(p) * dim * dim for p in party)
+    if entries > max_matrix_entries:
+        raise ValueError("Network matrices exceed max_matrix_entries")
+    sources = tuple(QuantumSource(matrix_from_dict(s["state"], prod(dims)), dims, s["tolerance"])
+                    for s, dims in zip(data["sources"], dimensions))
+    measurements = tuple(tuple(tuple(matrix_from_dict(e, dim) for e in povm) for povm in party)
+                         for party, dim in zip(data["measurements"], local_dims))
+    return QuantumNetworkStrategy(network, sources, measurements, data["tolerance"], max_total_dimension)

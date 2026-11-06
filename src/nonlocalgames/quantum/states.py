@@ -6,6 +6,8 @@ from numbers import Integral
 
 import numpy as np
 
+from ..core.numeric_data import positive_tolerance
+
 
 def validate_dimensions(dimensions):
     dimensions = tuple(dimensions)
@@ -77,8 +79,7 @@ def partial_transpose(state, dimensions, parties):
 def state_diagnostics(state, dimensions, *, tolerance=1e-9, ppt_cuts=()):
     """Validate a density matrix and optional PPT cuts numerically, without repair."""
     dimensions = validate_dimensions(dimensions)
-    if isinstance(tolerance, bool) or not np.isfinite(tolerance) or tolerance <= 0:
-        raise ValueError("tolerance must be positive and finite")
+    tolerance = positive_tolerance(tolerance)
     matrix = _matrix(state, dimensions)
     hermiticity = float(np.linalg.norm(matrix - matrix.conj().T, ord=2))
     trace = float(abs(np.trace(matrix) - 1))

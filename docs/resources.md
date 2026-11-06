@@ -57,8 +57,8 @@ print(result.value, task.evaluate(result.witness).diagnostics)
 ```
 
 Here the search changes local POVMs only. Without a fixed state, the same method
-also updates the state within the dimension bounds. This remains a bipartite
-heuristic, and shared randomness does not turn its output into a global optimum.
+also updates the state within the dimension bounds. The search supports any finite
+number of parties and remains a heuristic, and shared randomness does not turn its output into a global optimum.
 The search retains an actual validated branch; it does not construct a convex
 decomposition of arbitrary behaviors.
 
@@ -183,3 +183,13 @@ also limits JSON bytes with `max_file_bytes`. Quantum-network decoding checks th
 product source dimension and aggregate source/global/POVM entry count through
 `max_total_dimension` and `max_matrix_entries`. Limits are configurable and failure
 never silently truncates a state, drops a source, or changes a resource contract.
+
+
+For `measurement_class="projective"`, see-saw supports one or two outputs per
+party. It uses spectral projectors of the local payoff difference, allowing zero
+and full-rank projectors without adding an ancilla. Larger projective outcome
+alphabets are rejected rather than converted to unrestricted POVMs. Ordinary POVM
+search still supports arbitrary finite outcome alphabets. The `max_joint_dimension`,
+`max_update_terms`, and `max_measurement_entries` guards bound dense state size,
+event terms per sweep, and stored measurement/effective-matrix entries respectively.
+They do not promise a particular runtime or convergence rate.

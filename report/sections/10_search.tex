@@ -1,0 +1,59 @@
+\section{Multipartite strategy search and binary projective updates}
+\label{sec:multipartitesearch}
+
+For a finite-dimensional one-round tensor-product realization, alternating
+optimization can update one local measurement at a time at any number of
+parties. It does not need a bipartite restriction. With all other measurements
+and the state fixed, the objective for party $i$ at question $x_i$ is
+\[
+ \sum_{a_i}\Tr(E^{(i)}_{a_i\mid x_i}H^{(i)}_{a_i\mid x_i}),
+ \qquad E^{(i)}_{a_i\mid x_i}\succeq0,\quad
+ \sum_{a_i}E^{(i)}_{a_i\mid x_i}=\id.
+\]
+The effective Hermitian matrices $H$ contract the state with the other
+parties' effects and sum over their questions and answers with the game
+coefficients. Their construction must retain the tensor-factor ordering,
+including complex conjugation conventions implicit in the trace.
+
+To make the convention explicit, permute party $i$ first and group the
+remaining systems into one factor. Writing the state as
+$\rho_{u r,v s}$ and the product of the other parties' effects as $O_{s r}$,
+the contribution to the effective matrix is
+\[
+ H_{u v}=\sum_{r,s}\rho_{u r,v s}O_{s r}.
+\]
+Then the score contribution is $\Tr(EH)$. This contraction also covers one
+party by using a one-dimensional empty tensor product. Tests compare the
+optimized block against a separately assembled full-tensor SDP for complex
+states and unequal local dimensions.
+
+\begin{proposition}[Binary measurement block]
+For Hermitian $H_0,H_1$, the maximum of
+$\Tr(E_0H_0)+\Tr(E_1H_1)$ over $E_0,E_1\succeq0$ with
+$E_0+E_1=\id$ is attained by a projective measurement:
+\[
+ E_0=\Pi_{>0}(H_0-H_1),\qquad E_1=\id-E_0.
+\]
+A choice of subspace in the zero eigenspace is immaterial to the value.
+\end{proposition}
+\begin{proof}
+Eliminating $E_1$ leaves the constant $\Tr H_1$ plus
+$\Tr(E_0\Delta)$ with $0\preceq E_0\preceq\id$ and
+$\Delta=H_0-H_1$. In an eigenbasis of $\Delta$, each diagonal entry of
+$E_0$ is in $[0,1]$. Set it to one on positive eigenvalues and zero on
+negative ones. The indicated projector realizes that optimum.
+\end{proof}
+The identity includes zero and full-rank projectors. A one-outcome
+measurement is necessarily the identity. Thus a dimension-constrained
+binary projective update needs no Naimark dilation and no measurement SDP.
+The general multi-outcome projective constraint is nonconvex and is not
+silently replaced by a POVM optimization.
+
+The complete search remains nonconvex: optimality of each block does not
+imply global optimality of the joint state-and-measurement strategy. Fixed
+states remain unchanged; free states use an eigenvector or a PPT-constrained
+state block. Every resulting strategy is checked against its dimension,
+state, and measurement contract. Numerical spectra and feasibility tolerances
+retain numerical evidence labels, including in the analytic binary update.
+Independent-source networks need factorized source-state updates and are not
+covered merely by allowing more parties in this ordinary tensor-product search.

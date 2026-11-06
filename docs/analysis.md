@@ -125,7 +125,9 @@ candidate = seesaw(chsh(), dimensions=(2, 2), seed=7, restarts=3,
 print(candidate.value, candidate.strategy.validate())
 ```
 
-Each sweep optimizes local POVMs via SDP and the state via a largest eigenvector.
+Each multipartite sweep optimizes local POVMs via SDP and the state via a largest
+eigenvector or a constrained state block. Binary projective measurements instead
+use analytic spectral updates in the declared local dimensions.
 Returned POVMs undergo PSD projection and congruence normalization, followed by
 whole-strategy validation and score recomputation. The best actual witness is
 retained; the score history is never forced to be monotone. `history` describes
@@ -200,9 +202,9 @@ state block gives approximately 0.676777, whereas optimizing both measurements
 and PPT states can reach 0.75. Tests distinguish these two claims.
 
 Fixed states never change during search. Dimension bounds are checked against
-the actual fixed-state factors. Projective-only searches are rejected by the
-POVM see-saw, while `state_sdp` can accept supplied projective measurements after
-checking them. Every returned strategy is rechecked against the task contract.
+the actual fixed-state factors. Projective searches support one or two outcomes per party using spectral updates;
+more outcomes are rejected. `state_sdp` can accept supplied projective measurements
+with any number of outcomes after checking them. Every returned strategy is rechecked against the task contract.
 PPT repairs mix with the identity to restore all required positivity constraints;
 raw objectives and recomputed witness scores remain separate. A direct low-level
 `optimize_state` result exposes both as `.objective` and `.value`.

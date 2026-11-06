@@ -56,7 +56,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |
 | XOR SDP | Bipartite binary outputs, parity-only reward | Numerical evaluation of an exact characterization |
 | Quantum strategy evaluator | Finite tensor-product state and POVMs | Numerically validated witness and score |
-| Restricted quantum search | Bipartite dimensions, fixed states, PPT state constraints | Seeded heuristic; restrictions rechecked on witnesses |
+| Restricted quantum search | Multipartite dimensions, fixed/PPT states; POVMs or binary projectors | Seeded heuristic; restrictions rechecked on witnesses |
 | Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |
 | Independent-source networks | Exact classical / numerical quantum source factorization | Constructive witnesses and tensor-order checks |
 | Network compatibility | Source-disjoint marginals, triangle Finner, bilocal inequality | Exact rational necessary tests; passing is generally inconclusive |

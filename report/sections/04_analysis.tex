@@ -66,8 +66,9 @@ numerically validated witness. Symbolic exact checks or interval error bounds
 are needed for certified feasibility. Alternating optimization can search for
 witnesses in a fixed dimension, but its stationary point is a lower-bound
 candidate, not a global optimum.
-The implemented bipartite see-saw alternates a largest-eigenvector state
-update with local POVM semidefinite updates and uses seeded restarts.
+The implemented multipartite see-saw alternates eigenvector or constrained state
+updates with local POVM semidefinite or binary projective spectral updates and
+uses seeded restarts; Section~\ref{sec:multipartitesearch} specifies its scope.
 
 \subsection{Symbolic certificates: CHSH as a complete example}
 Use observables $A_0,A_1,B_0,B_1$ with $A_x^2=B_y^2=\id$ and

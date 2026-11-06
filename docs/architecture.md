@@ -27,9 +27,9 @@ The coefficient lowering C[x,a] = mu[x] V[x,a] preserves every linear score. Kee
 mu and V as well retains experimental sampling, event semantics, and promise data.
 Input-dependent output alphabets require padding plus a proof that extra outputs do
 not change the resource-restricted optimum; arbitrary finite output sizes are not
-silently identified. Independent sources, causal rounds, quantum questions, referee
-systems, postselection denominators, and dimension limits must remain explicit in
-future dialects. Flattening their visible probabilities alone loses constraints.
+silently identified. Independent sources and dimension limits are explicit resource constraints. Causal
+rounds, quantum questions, referee systems, and postselection denominators require
+additional dialects. Flattening their visible probabilities alone loses constraints.
 
 ```mermaid
 flowchart LR
@@ -85,8 +85,8 @@ adapter or a separately validated generator rather than extending ad hoc formula
 
 No hidden resource coercion is allowed. Generic quantum `AnalysisTask.solve()` is
 unsupported. Users explicitly request NPA outer relaxations, an XOR-specific SDP,
-or finite-dimensional strategy evidence. Dimension-constrained optimization and
-network restrictions cannot be inferred from a generic Bell functional.
+or finite-dimensional strategy evidence. Dimension-constrained searches, fixed-state/PPT restrictions, and source networks
+are selected through ResourceSpec; they cannot be inferred from a generic Bell functional.
 
 ## Next implementation gates
 
@@ -95,7 +95,8 @@ network restrictions cannot be inferred from a generic Bell functional.
    dual certificates. Numerical bounds need independent rigorous verification.
 3. Add sparse/factorized rule IR, symmetry actions, and reduction proof records;
    benchmark build time separately from solve time and certificate verification.
-4. Add source-incidence and causal-protocol dialects with rejection tests for
-   invalid lowerings. Shared global randomness must not erase source independence.
+4. Extend the implemented source-incidence witnesses and exact compatibility
+   fragments with inflation and causal protocols. Shared global randomness must
+   not erase source independence.
 5. Add target equivalence, extraction channels, and robustness certificates before
    exposing a self-testing claim API. Optimizer uniqueness is insufficient.

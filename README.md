@@ -4,10 +4,11 @@ Primitives and analysis tools for quantum nonlocal games. The research goal is t
 make game construction composable while keeping resource assumptions and the
 strength of each analysis result explicit.
 
-The working core covers finite, one-round games with classical inputs and outputs.
-The [theoretical report](report/main.tex) develops the broader representation,
-including the structures required for networks, sequential games, and quantum
-interfaces. These extensions are research designs, not implemented backends.
+The working core covers finite, one-round games with classical inputs and outputs,
+composable quantum resource restrictions, and explicit independent-source networks.
+The [theoretical report](report/main.tex) develops the representation and proof
+contracts. Trusted quantum interfaces, sequential protocols, and general network
+optimization remain research extensions.
 
 ## Quick start
 
@@ -48,14 +49,18 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 
 | Tool | Scope | Evidence |
 |---|---|---|
-| Rule builder and JSON | Rational finite interfaces, promises, signed scores | Exact representation |
+| Rule builder and JSON | Rational games, resource contracts, and network witnesses | Versioned representation with explicit numerical quantum data |
 | Relabelling, hidden mixture, parallel product | Explicit local information semantics | Exact construction |
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |
 | XOR SDP | Bipartite binary outputs, parity-only reward | Numerical evaluation of an exact characterization |
 | Quantum strategy evaluator | Finite tensor-product state and POVMs | Numerically validated witness and score |
-| See-saw search | Bipartite, specified local dimensions | Seeded heuristic with validated strategy witnesses |
+| Restricted quantum search | Bipartite dimensions, fixed states, PPT state constraints | Seeded heuristic; restrictions rechecked on witnesses |
+| Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |
+| Independent-source networks | Exact classical / numerical quantum source factorization | Constructive witnesses and tensor-order checks |
+| Network compatibility | Source-disjoint marginals, triangle Finner, bilocal inequality | Exact rational necessary tests; passing is generally inconclusive |
+| No-input bilocal reconstruction | Arbitrary finite output alphabets on a three-party chain | Exact membership decision and constructive source model |
 | CHSH symbolic checker | Canonical CHSH involution algebra | Exact SOS bound and attaining realization |
 
 The benchmark library includes CHSH, GHZ, magic square, and GYNI. No generic
@@ -70,6 +75,9 @@ After installation:
 mkdir -p output
 python scripts/benchmark.py --solver SCS > output/benchmarks.json
 python scripts/search_xor.py --steps 20 > output/xor-search.json
+python scripts/resource_benchmark.py > output/resources.json
+python scripts/network_benchmark.py > output/networks.json
+python scripts/network_compatibility.py > output/network-compatibility.json
 bash scripts/build_report.sh
 ```
 
@@ -80,7 +88,8 @@ references are ignored by Git. Public bibliographic identifiers are kept in
 
 See [architecture and stack choices](docs/architecture.md),
 [analysis semantics and API](docs/analysis.md),
-[development workflow](docs/development.md), and the
+[resource contracts](docs/contracts.md), [restricted-resource API](docs/resources.md),
+[network analysis](docs/networks.md), [development workflow](docs/development.md), and the
 [research roadmap](docs/research.md).
 
 ```text

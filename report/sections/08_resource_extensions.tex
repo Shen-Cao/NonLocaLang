@@ -1,0 +1,213 @@
+\section{Composable restrictions and independent-source witnesses}
+\label{sec:resourceextensions}
+
+A resource description becomes more expressive when restrictions can be
+combined without erasing their individual meanings. The finite-interface
+extension records a base correlation model, local dimension bounds, an
+external shared-randomness policy, a state constraint, a measurement class,
+and optionally a fixed supplied state. An admissible realization must satisfy
+all applicable restrictions. These fields do not imply that a backend exists
+for every combination.
+
+\subsection{Dimensions, randomness, and admissible operations}
+A local dimension bound $d_i$ limits the Hilbert space on which player $i$'s
+state and measurement act. A fixed state supplies its own tensor-factor
+ordering and dimensions; a larger numerical bound does not automatically
+append an ancilla or replace the fixed state. In particular, a restriction to
+projective measurements means projectors on the declared system. General
+POVMs cannot be silently replaced by projective dilations when dimension or
+ancilla access is constrained. Dimension-sensitive outer relaxations require
+additional machinery beyond ordinary NPA \cite{navascues2015}.
+
+External shared randomness allows the players to choose a common admissible
+strategy branch before receiving their questions. With a fixed-state
+contract, every branch uses the same supplied state; only otherwise permitted
+choices may vary. This policy is separate from the correlations already
+present in a mixed quantum state. Forbidding external randomness does not
+require that the density matrix be pure, nor does it remove classical
+correlations encoded inside the specified quantum resource.
+
+\begin{proposition}[External convexification and linear scores]
+\label{prop:convexification}
+For any nonempty admissible behavior set $\mathcal R$ and linear score $S_G$,
+\[
+ \sup_{p\in\operatorname{conv}\mathcal R}S_G(p)
+ =\sup_{p\in\mathcal R}S_G(p).
+\]
+Consequently external shared randomness changes neither the optimal linear
+score nor a valid linear upper bound, although it can change membership and
+nonlinear witnesses.
+\end{proposition}
+\begin{proof}
+The score of a finite convex mixture is the same mixture of the branch
+scores and cannot exceed their supremum. The reverse inequality follows from
+$\mathcal R\subseteq\operatorname{conv}\mathcal R$.
+\end{proof}
+This observation does not authorize removing the randomness policy from a
+resource type. A membership query, fixed-dimensional realization, or network
+compatibility test can distinguish a set from its convex hull.
+
+\begin{proposition}[Product resources have the local linear value]
+\label{prop:productvalue}
+Suppose the quantum state is a tensor product across all players, either fixed
+or freely chosen. Allow arbitrary local POVMs, or arbitrary projective
+measurements with zero projectors permitted. Then every finite game has the
+same optimal score as its ordinary classical local value, with or without
+external shared randomness.
+\end{proposition}
+\begin{proof}
+The Born probabilities factor across players, so every allowed behavior is
+local. Conversely, any deterministic response is implemented by assigning
+$\id$ to its selected outcome and zero to every other outcome, independently
+for each local question. These effects form a projective measurement on any
+nonzero local system. Such responses attain the local linear optimum.
+\end{proof}
+The statement concerns values, not equality of unconvexified behavior sets.
+It also depends on permitting degenerate measurements: a requirement that all
+outcomes have nonzero rank would define a different resource model.
+The implementation uses this exact reduction only for a symbolic product-state
+resource without a supplied numerical state. A fixed matrix accepted as
+approximately product within a tolerance is not thereby proved exactly product;
+its numerical evaluation or search must retain a numerical evidence label.
+
+\subsection{Fixed states and positive partial transpose}
+For a supplied state $\rho_0$, the optimization variables are only the allowed
+local measurements. Alternating measurement optimization holds $\rho_0$
+unchanged. A state eigenvector update would solve a different problem. Even
+when each measurement update is an SDP, the combined optimization is
+nonconvex and a see-saw output supplies only numerical achievable evidence.
+
+For a nonempty proper subset $S$ of parties, let $T_S$ denote partial
+transposition on those tensor factors. A PPT restriction across a specified
+collection $\mathcal C$ of cuts is
+\[
+ \rho\succeq0,\qquad \Tr\rho=1,\qquad
+ \rho^{T_S}\succeq0\quad(S\in\mathcal C).
+\]
+Complementary cuts impose equivalent positivity conditions. The chosen cuts
+must nevertheless be explicit; being PPT across one cut is not a declaration
+of positivity across every bipartition. Every state separable across a cut
+is PPT across that cut \cite{peres1996}. The converse holds for bipartite
+$2\times2$ and $2\times3$ systems, but fails in general
+\cite{horodecki1996}. Thus PPT is a tractable constraint, not an alias for
+separability or for absence of Bell nonlocality.
+
+\begin{proposition}[Scope of a fixed-measurement PPT optimization]
+Fix local measurements $M$ and their Bell operator $\mathcal B_M$. The program
+\[
+ u_{\rm PPT}(M)=\max_\rho\Tr(\rho\mathcal B_M)
+ \quad\text{subject to the stated PPT constraints}
+\]
+is an SDP. Its exact optimum bounds the score of every state obeying those
+constraints with these same measurements. It is not in general an upper bound for
+$\sup_{M'}u_{\rm PPT}(M')$.
+\end{proposition}
+\begin{proof}
+The objective is linear in $\rho$, and positivity, trace, and partial
+transpose positivity are semidefinite or affine constraints. The fixed
+measurement family is one choice in the larger optimization, so
+$u_{\rm PPT}(M)\leq\sup_{M'}u_{\rm PPT}(M')$.
+\end{proof}
+A see-saw that alternates this state problem with local POVM updates remains
+a heuristic for the joint problem. Numerical repair must respect all active
+cones, and scores must be recomputed after repair. For example, mixing a
+Hermitian normalized candidate with the maximally mixed state can move both
+its ordinary and partial-transpose spectra into the positive cone. Finite
+precision checks and repairs are not exact certificates.
+
+\subsection{Networks retain the source factorization}
+An independent-source witness specifies a hypergraph and one state or latent
+variable distribution for each source. In a quantum witness, the global
+source state is constructed as $\bigotimes_e\rho_e$. Its factors are then
+permuted into party order before local joint POVMs are applied. Source order,
+endpoint order, and the resulting party-local factor order are part of the
+representation. Accepting an arbitrary global density matrix in place of
+these factors would discard independence.
+
+A classical finite-source witness similarly uses an explicit product of
+rational latent-variable distributions and rational local response tables.
+Such a witness can be evaluated exactly. It is a constructive compatibility
+certificate for its resulting behavior, not a complete membership procedure
+for arbitrary supplied behavior tables. Quantum source witnesses are checked
+numerically. General network outer approximations, for example inflation,
+remain a separate backend capability \cite{wolfe2021}.
+
+\begin{proposition}[Classical network convex hull and linear values]
+\label{prop:networklinear}
+Fix any independent-source classical network, with unrestricted local response
+functions. Let $\mathcal N$ be its behavior set in a finite Bell arena and
+$\Lset$ the ordinary local polytope on the same arena. Then
+\[
+ \operatorname{conv}\mathcal N=\Lset,\qquad
+ \sup_{p\in\mathcal N}S_G(p)=\val_{\Lset}(G).
+\]
+The result also holds if source distributions and finite latent cardinalities
+are fixed, provided they are valid and every party can ignore its sources.
+\end{proposition}
+\begin{proof}
+A network realization is ordinary local by collecting all source variables
+into one hidden variable with their joint product distribution. Conversely,
+every deterministic local response tuple belongs to $\mathcal N$: the
+parties ignore their sources. The convex hull of these deterministic tuples
+is $\Lset$. The value equality follows either from these inclusions or from
+Proposition~\ref{prop:convexification}.
+\end{proof}
+Thus an exact ordinary classical optimizer is a sound network \emph{linear
+value} backend under these assumptions, with an optimal witness that ignores
+all sources. It is not a sound network \emph{membership} backend. Source
+constraints can distinguish behaviors and nonlinear witnesses even though
+no linear functional separates their optimum values. Restricting local
+response families or imposing additional observed statistics changes the
+premises and requires a new analysis.
+
+The bilocal chain $A$--$B$--$C$ has independent sources on $AB$ and $BC$.
+Let $A$ and $C$ have binary inputs $x,z$ and binary outputs, while $B$ has
+one input and a two-bit output $(b_0,b_1)$. With signs
+$A_x=(-1)^a$, $B^k=(-1)^{b_k}$, and $C_z=(-1)^c$, define
+\[
+ I=\tfrac14\sum_{x,z}\langle A_xB^0C_z\rangle,\qquad
+ J=\tfrac14\sum_{x,z}(-1)^{x+z}\langle A_xB^1C_z\rangle.
+\]
+Every classical bilocal behavior obeys
+\begin{equation}
+ \sqrt{|I|}+\sqrt{|J|}\leq1.
+ \label{eq:bilocal}
+\end{equation}
+This is a nonlinear distribution witness \cite{branciard2012}.
+For completeness, write $a_\pm(\lambda)=(A_0(\lambda)\pm
+A_1(\lambda))/2$ and similarly $c_\pm(\nu)$. Independence gives
+$|I|\leq uv$ and $|J|\leq u'v'$, where
+$u=\mathbb E|a_+|$, $u'=\mathbb E|a_-|$, and similarly $v,v'$.
+Because $|a_+|+|a_-|\leq1$, Cauchy--Schwarz yields
+$\sqrt{uv}+\sqrt{u'v'}\leq\sqrt{(u+u')(v+v')}\leq1$.
+
+Two independent Bell pairs, Bob's joint measurement of $Z\otimes Z$ and
+$X\otimes X$, and the end measurements
+$(Z+(-1)^xX)/\sqrt2$ give $I=J=1/2$. The resulting value is $\sqrt2$.
+This construction tests source factorization and tensor ordering as well as
+the nonlinear witness. It is not an ordinary scalar game-value claim.
+
+The same expression exhibits why global shared randomness cannot be added
+silently. One deterministic behavior has all output signs $+1$, giving
+$(I,J)=(1,0)$. Another uses $A_x=(-1)^x$, $C_z=(-1)^z$, and Bob's signs $+1$,
+giving $(I,J)=(0,1)$. Both are bilocal. Their equal mixture gives
+$(I,J)=(1/2,1/2)$ and violates Eq.~\eqref{eq:bilocal}. The mixture is
+ordinary Bell-local, but needs a common branch variable unavailable in the
+independent-source model. The ordinary local polytope is therefore an invalid
+replacement for bilocal compatibility.
+
+\subsection{Capabilities and evidence remain separate}
+Resource validation asks whether a supplied strategy satisfies a contract.
+Search asks for a high-scoring witness inside that contract. Relaxation asks
+for an outer bound, and certification independently checks a mathematical
+claim. These operations must not share an ambiguous success flag. In
+particular, a source witness can be flattened for ordinary Born-rule
+evaluation while its source structure is retained for checking; that
+flattening does not justify using an unrestricted optimizer as a network
+optimizer.
+
+Dimension-sensitive global bounds, generic separability or entanglement-depth
+constraints, network optimization and inflation adapters, trusted quantum
+questions, and sequential instruments require further backends. The resource
+schema makes these extension points explicit without asserting that a single
+solver can handle them all.

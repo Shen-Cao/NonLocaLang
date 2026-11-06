@@ -3,9 +3,11 @@
 The theoretical report is built from `report/main.tex`. It separates five
 semantic components: arena and information flow, verifier, admissible
 resources, analysis question, and optional target realizations/equivalences.
-The first executable fragment is finite, classical-interface, one-round games.
-The report proposes a typed causal extension without claiming that this is
-already implemented.
+The executable fragments cover finite, classical-interface, one-round games,
+composable state/measurement restrictions, and explicit independent-source
+network witnesses. See [resource contracts](resources.md) for supported analysis
+methods. A broader typed causal extension remains a design rather than an
+implemented sequential or quantum-interface backend.
 
 ## Results established in the report
 
@@ -76,15 +78,27 @@ to build or use the tracked project.
 3. **Composition of rigidity.** Establish conditions under which saturation
    relations from component games admit compatible local extraction maps.
    Track how mixture weights and dimension costs affect robustness.
-4. **Independent-source compatibility.** Introduce source hypergraphs and a
-   distribution-valued task, with an Inflation adapter and explicit handling of
-   global shared randomness. Test that unsupported Bell backends are rejected.
+4. **Independent-source compatibility.** Extend the implemented source
+   hypergraphs, exact classical and numerical quantum witness evaluators, and
+   bilocal/triangle inequalities, source-disjoint marginal checks, and exact
+   no-input chain reconstruction with an Inflation adapter and general
+   compatibility tasks. Keep global shared randomness explicit; ordinary Bell backends must
+   not replace the independent-source constraints.
 5. **Trusted and sequential interfaces.** Add semiquantum states and causal
    channels as typed objects. Demonstrate a faithful lowering on one restricted
    example before generalizing.
 6. **Experimental and cryptographic metrics.** Introduce explicit noise,
    sampling, detection, memory, and adversary models. Winning-probability gaps
    alone do not establish statistical significance or secret randomness.
+
+The resource extension also proves that external convexification preserves
+linear values, gives an exact product-resource value reduction when no
+numerically supplied state is involved, and distinguishes fixed-measurement
+PPT optima from the global quantum value. For unrestricted local response functions, every classical network has the
+ordinary local polytope as its convex hull and thus the same linear game
+values; this does not identify their compatibility sets. The bilocal
+regression shows that global shared randomness can invalidate a nonlinear
+network constraint.
 
 General self-testing, a universal optimizing compiler, and complete quantum
 value computation are not current capabilities. The meaningful progress

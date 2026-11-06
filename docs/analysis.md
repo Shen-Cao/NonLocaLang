@@ -15,8 +15,9 @@ print(result.value, result.witness)  # exact fraction and local response tables
 
 `Resource.QUANTUM_FINITE`, `QUANTUM_CLOSURE`, and `QUANTUM_COMMUTING` are distinct
 semantic tags. A dimension tuple is allowed only with the finite tensor-product
-tag and must match the parties. Generic quantum `solve()` is unsupported. A
-resource tag is not a promise that an appropriate optimizer exists.
+tag and must match the parties. Quantum `solve()` requires an explicit supported method. `capabilities()` checks
+the complete restriction set; a resource tag alone is not a promise that an
+appropriate optimizer exists.
 
 ## Result interpretation
 

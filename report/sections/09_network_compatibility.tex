@@ -1,0 +1,134 @@
+\section{Nonlinear compatibility checks with explicit scope}
+\label{sec:networkcompatibility}
+
+The value equality in Proposition~\ref{prop:networklinear} makes a
+behavior-valued task essential for testing source independence. A
+compatibility checker must report either a constructive realization, a
+violated necessary condition, or an unresolved case. Satisfying a finite
+list of necessary conditions does not establish compatibility.
+
+\subsection{Independence of source-disjoint marginals}
+For a set $U$ of parties, let $E(U)$ denote the union of sources incident to
+at least one party in $U$.
+\begin{proposition}[Source-disjoint groups]
+\label{prop:sourcedisjoint}
+Suppose disjoint party groups $U,V$ satisfy $E(U)\cap E(V)=\varnothing$.
+In an independent-source classical or tensor-product quantum network,
+with no additional global shared randomness or communication,
+\[
+ p(a_U,a_V\mid x)=p(a_U\mid x_U)\,p(a_V\mid x_V).
+\]
+The equation is a marginal over all other outputs, not a condition on their
+values. Inputs are fixed independently of the sources.
+\end{proposition}
+\begin{proof}
+In the classical model, summing other local outputs removes their normalized
+response factors. The remaining response factors depend on disjoint
+collections of independent source variables, so their expectation factors.
+In the quantum model, summing the other POVMs gives identities. Tracing their
+systems out of the product source state leaves a product between the systems
+in $U$ and those in $V$, since no source meets both groups. The Born trace
+therefore factors. Independence from inputs outside each group follows in
+the same way.
+\end{proof}
+In a bilocal chain this forces $p(a,c\mid x,z)=p(a\mid x)p(c\mid z)$.
+Conditioning on Bob's output can correlate the end parties through
+entanglement swapping, so the unconditional factorization must not be
+applied to such postselected data. An observed violation excludes both the
+classical and the specified quantum independent-source model, under the
+stated assumptions.
+
+\subsection{A triangle event inequality}
+For the triangle with independent pair sources $AB$, $BC$, and $CA$, every
+classical behavior obeys, at each fixed input tuple,
+\begin{equation}
+ p(a,b,c\mid x,y,z)^2\leq
+ p_A(a\mid x)\,p_B(b\mid y)\,p_C(c\mid z).
+ \label{eq:trianglefinner}
+\end{equation}
+This is the triangle specialization of Finner's product-space inequality
+\cite{finner1992}. Network versions and a quantum extension for independent
+bipartite sources are established by Renou et al.~\cite{renou2019limits}.
+The checker records applicability to both classical and quantum independent
+pair sources. The elementary proof below establishes the classical case;
+the quantum case uses the cited theorem rather than replacing operator
+algebra by classical hidden variables.
+
+Let $r,s,t$ be the independent variables of the three sources and let
+$f(r,t)$, $g(r,s)$, and $h(s,t)$ be the local conditional probabilities of
+the selected events. Private local randomness is already absorbed into
+these functions, so $0\leq f,g,h\leq1$. At the fixed inputs,
+$p(a,b,c)=\mathbb E[fgh]$. Two Cauchy--Schwarz applications give
+\begin{align*}
+ \mathbb E[fgh]
+ &\leq \mathbb E_{s,t}\!\left[h(s,t)
+       \sqrt{\mathbb E_r f(r,t)^2\,\mathbb E_r g(r,s)^2}\right],\\
+ \bigl(\mathbb E[fgh]\bigr)^2
+ &\leq \mathbb E[h^2]\,
+   \mathbb E_{s,t}\!\left[\mathbb E_r f(r,t)^2\,
+                         \mathbb E_r g(r,s)^2\right]\\
+ &=\mathbb E[f^2]\,\mathbb E[g^2]\,\mathbb E[h^2]
+ \leq\mathbb E[f]\,\mathbb E[g]\,\mathbb E[h].
+\end{align*}
+The last expectations are the three marginal event probabilities.
+
+For example, the common-random-bit distribution
+$p(000)=p(111)=1/2$ violates Eq.~\eqref{eq:trianglefinner}:
+the event $000$ has squared probability $1/4$, while the product of its
+marginals is $1/8$. Thus a common tripartite classical source cannot be
+silently replaced by three independent pair sources. A nonviolation of
+these event inequalities supplies no general realization theorem. The
+checker does not interpret an arbitrary nonsignalling table as a network
+of independent nonsignalling resources; that is a separate physical model.
+
+\subsection{An exactly solvable no-input chain fragment}
+When all parties in a bilocal chain have one input, source-disjoint
+independence is also sufficient for compatibility, for arbitrary finite
+output alphabets \cite{renou2019limits}.
+\begin{proposition}[No-input bilocal reconstruction]
+\label{prop:noinputbilocal}
+A normalized distribution $p(a,b,c)$ admits a classical independent-source
+realization on $A$--$B$--$C$ if and only if
+$p_{AC}(a,c)=p_A(a)p_C(c)$. The same condition characterizes the
+finite-dimensional quantum independent-source behaviors in this no-input
+fragment.
+\end{proposition}
+\begin{proof}
+Necessity in both models follows from
+Proposition~\ref{prop:sourcedisjoint}. For sufficiency, the first source
+samples $\lambda=a$ from $p_A$, and the second samples $\nu=c$ from $p_C$,
+independently. Alice and Charlie output these variables. Bob receives both
+and samples
+\[
+ q(b\mid\lambda=a,\nu=c)=
+ \frac{p(a,b,c)}{p_A(a)p_C(c)}
+\]
+whenever the denominator is positive. The assumed factorization normalizes
+this response. If the denominator is zero, normalization and nonnegativity
+force every $p(a,b,c)$ in that row to vanish, and Bob may use any normalized
+response there. The constructed joint probability is exactly $p(a,b,c)$.
+A finite classical source/response model embeds into quantum theory using
+orthogonal classical registers and diagonal POVMs.
+\end{proof}
+Rational input data produce rational source probabilities and responses, so
+both the independence condition and the reconstructed witness can be checked
+exactly. The proposition does not extend to multi-input bilocal games: one
+must then use a common source model across the input choices, and the
+marginal equality alone is insufficient.
+
+\subsection{Certificates, tolerances, and unresolved cases}
+For rational tables, a violation certificate can name an input profile, an
+output event or marginal event, and the exact rational residual. A checker
+recomputes that residual from the full supplied table and source graph,
+including normalization and all applicability conditions. No floating square
+root is needed for Eq.~\eqref{eq:trianglefinner}. Such a certificate excludes
+a resource model for the supplied distribution; it is not an experimental
+confidence statement.
+
+The general compatibility checks accept only exact rational, normalized,
+non-signalling tables and reject floating input. The separate bilocal
+inequality evaluator also supports floating tables with explicit tolerances
+and numerical evidence labels. No violation found means only that the
+implemented conditions did not exclude the data. The constructive no-input chain result is an exception with a
+proved sufficient condition and an explicit witness, not a precedent for
+promoting generic passing checks to membership certificates.

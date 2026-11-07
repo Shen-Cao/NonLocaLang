@@ -1,5 +1,10 @@
 # NonLocaLang
 
+> [!NOTE]
+> This project is incomplete and still under active development. It is largely
+> vibe-coded and has not yet received thorough human review, so APIs, results,
+> and documentation may change without notice.
+
 Primitives and analysis tools for quantum nonlocal games. The research goal is to
 make game construction composable while keeping resource assumptions and the
 strength of each analysis result explicit.

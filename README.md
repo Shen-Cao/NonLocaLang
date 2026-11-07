@@ -116,3 +116,7 @@ python -m nonlocalgames task --file output/task.json --method seesaw --seed 7 --
 
 Create the task file with `core.resource_serialization.dump_task`; the
 [resource API guide](docs/resources.md) explains which methods enforce each contract.
+
+## License
+
+MIT — see [LICENSE](LICENSE).

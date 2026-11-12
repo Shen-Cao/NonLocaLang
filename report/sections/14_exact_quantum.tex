@@ -1,0 +1,113 @@
+\section{Exact finite-dimensional quantum lower witnesses}
+\label{sec:exactquantum}
+
+A quantum upper certificate alone cannot establish an advantage over the local
+value. A complementary certificate is an explicit admissible realization whose
+score is evaluated exactly. We represent density matrices and local POVM effects
+over $\mathbb Q+i\mathbb Q$, retaining the original local tensor dimensions.
+Exact Hermiticity, state trace, positivity, and POVM completeness establish a
+finite tensor-product strategy. Its rational Born score $s$ then proves
+$\val_{\Q_{\rm fin}}(G)\geq s$ for a rational verifier.
+
+\subsection{Complex positivity and tensor order}
+For a Hermitian matrix $H=A+iB$, where $A^T=A$ and $B^T=-B$, define
+\[
+ \mathcal R(H)=\begin{pmatrix}A&-B\\B&A\end{pmatrix}.
+\]
+For $z=x+iy$, direct expansion gives
+\[
+ z^\dagger Hz=\begin{pmatrix}x^T&y^T\end{pmatrix}
+ \mathcal R(H)\begin{pmatrix}x\\y\end{pmatrix}.
+\]
+Hence $H\succeq0$ if and only if $\mathcal R(H)\succeq0$, which can be checked
+with the rational Schur procedure of Section~\ref{sec:xorcertificates}. This is
+only a verification representation. It does not double the physical local
+systems, and tensoring the separate realifications is not the original complex
+tensor model. The implementation first computes complex tensor products in the
+declared factor order and then evaluates the Born trace exactly. Its imaginary
+part must vanish, probabilities must be nonnegative, and each conditional row
+must sum to one.
+
+\subsection{Rounding and repair with explicit scope}
+The use of numerical discovery followed by rational verification is related to
+exact reconstruction techniques for semidefinite certificates
+\cite{peyrl2008}. Here the constraints are state normalization and POVM
+normalization, and the final object is a feasible strategy rather than an SOS
+upper certificate. A numerical candidate is converted explicitly; no floating
+entry is accepted by the exact matrix decoder.
+
+Let $\widehat\rho$ be a rational Hermitian approximation in dimension $D$.
+Set
+\[
+ \rho_0=\widehat\rho+\frac{1-\Tr\widehat\rho}{D}\id.
+\]
+This has trace one even when coarse rounding made the approximate trace zero.
+For a $k$-outcome POVM with rational Hermitian approximations $\widehat E_a$, set
+\[
+ F_a=\widehat E_a+\frac{\id-\sum_b\widehat E_b}{k}.
+\]
+Then $\sum_aF_a=\id$. These affine corrections need not preserve positivity.
+For rational $t,u\in[0,1]$, define
+\[
+ \rho(t)=(1-t)\rho_0+t\id/D,\qquad
+ E_a(u)=(1-u)F_a+u\id/k.
+\]
+The same $u$ is used for all effects of each POVM. At $t=u=1$ the state and
+measurements are exactly feasible. Exact PSD tests and a bounded bisection can
+retain a feasible endpoint closer to the uncorrected candidate. The final
+strategy is fully rechecked, and its score is recomputed; no numerical objective
+or eigenvalue becomes a proof merely through rounding.
+
+This repair preserves physical dimensions. It does not in general preserve a
+fixed state, projectivity, product-state form, PPT restrictions, or independent
+sources. Those promises require additional checks or a different construction.
+The initial certificate schema therefore declares only the unrestricted finite
+tensor-product model. Dimension bounds can be checked directly against an exact
+point, but unsupported resource promises must not be inherited from its numerical
+origin.
+
+\begin{proposition}[Density for strict score comparisons]
+For fixed finite local dimensions and finite input/output alphabets, rational
+complex states and POVMs satisfying the exact constraints are dense in the
+ordinary tensor-product strategy space. Consequently any strict score advantage
+attained by such a strategy is also attained by a sufficiently close rational
+feasible strategy.
+\end{proposition}
+\begin{proof}
+Mix a state and its POVMs by arbitrarily small amounts with the normalized
+identities. The resulting matrices are strictly positive. Rational Hermitian
+approximations, followed by the affine trace and completeness corrections above,
+can be chosen arbitrarily close to them. Sufficiently small perturbations remain
+positive because the positive-definite cone is open. The Born score is continuous
+in the finitely many matrix entries, so a strict score comparison is preserved.
+\end{proof}
+This statement does not give a uniform search-success, dimension, or runtime
+bound. Precision and repair budgets must be allowed to increase for arbitrary
+approximation. It also does not guarantee rational attainment of every perfect
+or optimal strategy. For example, a rational verifier and rational matrix data
+have a rational score, whereas the optimal CHSH winning probability is irrational.
+The symbolic CHSH certificate remains a separate exact algebraic path.
+
+\subsection{Reference certificates and implementation boundary}
+A Bell-state density matrix with rational entries, Alice's observables $(Z,X)$,
+and Bob's observables $(cZ+sX,cZ-sX)$ with
+\[
+ c=803761/1136689,\qquad s=803760/1136689,\qquad c^2+s^2=1
+\]
+give the exact CHSH score
+\[
+ \tfrac12+\tfrac14(c+s)=\frac{3880899}{4546756}>\tfrac34.
+\]
+The GHZ X/Y strategy and the chosen magic-square strategy also admit rational
+complex data and achieve score one. An optional Julia standard-library script
+checks these reference constructions independently with unbounded rational
+integers; Julia is not a dependency of the Python verifier.
+
+Portable certificates bind the verifier fingerprint, physical dimensions, full
+state/POVM data, and claimed score. Decoding verifies canonical rational strings
+under explicit bit and allocation budgets. All integer components are normalized
+to unbounded integers, including values originally held in fixed-width array
+scalars. Budget exhaustion is distinct from a failed positivity test. Rechecking
+uses exact arithmetic and supplies a lower bound only; it establishes neither
+optimality nor self-testing. The claim layer can combine this lower witness with
+an independently checked classical upper bound to prove a positive quantum gap.

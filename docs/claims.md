@@ -55,6 +55,7 @@ artifact. Hashes establish content identity, not mathematical truth or authorshi
 | `local_enumeration` | Standard local | `strategy`, exact `value` string | Lower and upper after independent exhaustive replay |
 | `nonsignalling_lp` | Standard nonsignalling | Rational-string `primal` and `dual` arrays | Exact NS lower/upper feasibility bounds |
 | `xor_dual` | Standard commuting quantum | Existing fingerprinted XOR dual certificate | Exact commuting upper bound, also applicable downward |
+| `quantum_strategy` | Standard finite tensor quantum | Full rational quantum lower certificate | Exact achieved quantum lower score |
 | `numerical_hint` | Recorded source context | JSON observation object | No certified bounds, regardless of asserted labels |
 
 The equality-dual XOR certificate bounds commuting strategies for its supported
@@ -120,3 +121,9 @@ resource-inclusion rules, parsing, arithmetic, and checker implementation. This 
 independent certificate checking, not a proof-assistant formalization. Differential
 and adversarial tests remain necessary, including tests of model compilers shared
 between numerical discovery and exact verification.
+
+Exact quantum evidence is described in [exact quantum witnesses](exact-quantum.md).
+The quantum checker has explicit dimension, realification, matrix-entry, event,
+party, and scalar-bit budgets. It can prove a strict quantum gap from a feasible
+point and an independent classical upper bound; it does not claim global
+optimality or self-testing.

@@ -16,7 +16,8 @@ to preventing an incorrect mathematical claim.
 | M6: optional agent transport | A thin MCP or other transport adapter over the stable public operations | No duplicated mathematical logic, hidden solver fallback, or weakening of resource restrictions |
 
 The M0 claim/evidence fragment is implemented for the standard unrestricted
-resource chain; see [claims](claims.md). M1 is the current implementation priority.
+resource chain; see [claims](claims.md). M1 now supplies
+[exact quantum lower witnesses](exact-quantum.md). M2 is the next queued milestone.
 Dimension/PPT classical-value reductions
 remain useful theorem-backed inference rules for M2. Broader NPA, quantum inflation,
 and trusted/sequential interfaces are selected when a discovery experiment requires

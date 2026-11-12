@@ -67,6 +67,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Network compatibility | Source-disjoint marginals, triangle Finner, bilocal inequality | Exact rational necessary tests; passing is generally inconclusive |
 | Classical spiral inflation | No-input triangle, finite outputs | Exact Farkas exclusion or explicitly inconclusive relaxation feasibility |
 | No-input bilocal reconstruction | Arbitrary finite output alphabets on a three-party chain | Exact membership decision and constructive source model |
+| Exact quantum lower witnesses | Rational complex finite states/POVMs and explicit numerical repair | Independently checked feasible scores and proved strict gaps |
 | CHSH symbolic checker | Canonical CHSH involution algebra | Exact SOS bound and attaining realization |
 
 The benchmark library includes CHSH, GHZ, magic square, and GYNI. No generic
@@ -85,6 +86,7 @@ python scripts/resource_benchmark.py > output/resources.json
 python scripts/network_benchmark.py > output/networks.json
 python scripts/network_compatibility.py > output/network-compatibility.json
 python scripts/spiral_benchmark.py > output/spiral-benchmarks.json
+python scripts/quantum_certificate_demo.py > output/quantum-certificates.json
 bash scripts/build_report.sh
 ```
 

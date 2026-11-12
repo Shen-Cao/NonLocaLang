@@ -120,3 +120,8 @@ Create the task file with `core.resource_serialization.dump_task`; the
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+The active development order is recorded in the [discovery roadmap](docs/roadmap.md).
+The [claim layer](docs/claims.md) separates proved/disproved/unknown statements from
+execution status and independently admits data evidence. [Optional backends](docs/backends.md)
+remain isolated from the base Python package.

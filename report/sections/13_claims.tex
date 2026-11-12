@@ -1,0 +1,81 @@
+\section{Claims, evidence admission, and discovery semantics}
+\label{sec:claims}
+
+A solver result and a mathematical conclusion are distinct objects. A result
+may contain a numerical objective, a strategy candidate, or a dual certificate.
+A claim additionally specifies the verifier, resource model, threshold or
+target, and quantifiers. The verification verdict is \emph{proved},
+\emph{disproved}, or \emph{unknown}. Unknown is an epistemic outcome of the
+available checks, not a third truth value of the underlying proposition.
+Execution outcomes such as unsupported assumptions, invalid evidence, and
+budget exhaustion are recorded separately and never treated as disproofs.
+
+The initial claim fragment concerns value suprema in the standard resource
+chain of Eq.~\eqref{eq:chain}. It does not decide membership, perfect-strategy
+attainment, or self-testing. In particular, a proof that the finite-dimensional
+quantum supremum is one does not alone establish an attained perfect strategy
+\cite{slofstra2019}. More restrictive dimension, fixed-state, network, PPT, and
+measurement contracts remain explicit; an inference rule must justify any
+transport involving them before the claim engine accepts it.
+
+\begin{proposition}[Bound transport and threshold inference]
+If $\mathcal R\subseteq\mathcal S$, a lower bound for
+$\val_{\mathcal R}(G)$ is a lower bound for $\val_{\mathcal S}(G)$,
+and an upper bound for $\val_{\mathcal S}(G)$ is an upper bound for
+$\val_{\mathcal R}(G)$. Given checked intervals
+$L_R\leq\val_{\mathcal R}(G)\leq U_R$ and
+$L_S\leq\val_{\mathcal S}(G)\leq U_S$, the strict gap claim
+$\val_{\mathcal S}(G)-\val_{\mathcal R}(G)>\varepsilon$ is proved if
+$L_S-U_R>\varepsilon$, and disproved if $U_S-L_R\leq\varepsilon$.
+\end{proposition}
+\begin{proof}
+Resource monotonicity gives
+$\val_{\mathcal R}(G)\leq\val_{\mathcal S}(G)$. Subtracting the checked
+interval endpoints gives
+\[
+ L_S-U_R\leq\val_{\mathcal S}(G)-\val_{\mathcal R}(G)\leq U_S-L_R.
+\]
+The stated sufficient conditions follow, including the distinction between
+strict and non-strict threshold comparisons.
+\end{proof}
+An NS or NPA upper bound above a classical value therefore does not prove a
+quantum advantage. It leaves that possibility open. A numerical candidate can
+guide the next search, but cannot replace a certified lower witness in this
+inference. Contradictory checked intervals are treated as a conflict requiring
+an audit of the assumptions and checker, not resolved by preferring a solver.
+
+\subsection{Artifact identity is not proof authority}
+Evidence artifacts contain a versioned kind, an exact verifier identity, a
+complete source-resource representation, and an immutable canonical data
+payload. The verifier identity retains sampling and payoff separately and
+ignores only the descriptive name. Such an identity is not a quotient under
+local relabellings, affine score changes, or experimentally equivalent sampling.
+Those transformations require checked maps and their own inference rules.
+
+Content digests detect changes to an envelope, but anyone can construct an
+envelope and recompute its digest. Consequently evidence admission independently
+replays a registered check against the actual game. Deterministic response
+tables establish only their achieved score; an upper classical bound requires
+exhaustive replay or another proof. Rational NS primal/dual witnesses and XOR
+duals establish exactly the bounds checked by their respective verifiers.
+Numerical observations have no bound authority, even if a supplied result label
+claims exactness. Registering a label in an enumeration checks vocabulary, not
+mathematical truth.
+
+The admission record retains checker identifiers, versions, source models,
+bounds, and artifact references. A serialized assessment is a receipt rather
+than a standalone proof: its claim definition and raw evidence must remain
+available for rechecking. The trusted boundary includes the mathematical model
+compiler, resource-inclusion rules, parsing, arithmetic, and checker code.
+Independent rational verification does not by itself constitute proof-assistant
+formalization, and a shared compiler error can affect discovery and checking.
+
+\subsection{A bounded discovery workflow}
+The first executable workflow admits only a small set of precise evidence
+kinds and standard unrestricted resource models. Count and size budgets limit
+artifact admission, exhaustive replay, and matrix construction; they do not
+promise a global wall-clock bound. Unsupported inference remains unknown.
+Exact finite-dimensional quantum lower witnesses are the next prerequisite
+for general proved positive quantum-gap claims. Canonical transport, batch
+execution, template reuse, and a searchable evidence ledger then support
+repeated experiments without silently changing the mathematical question.

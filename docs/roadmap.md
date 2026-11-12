@@ -15,7 +15,9 @@ to preventing an incorrect mathematical claim.
 | M5: targeted scientific coverage | One structured family and one backend adapter justified by an experiment | Independent cross-checks and a verified translation back to the original mathematical task |
 | M6: optional agent transport | A thin MCP or other transport adapter over the stable public operations | No duplicated mathematical logic, hidden solver fallback, or weakening of resource restrictions |
 
-M0 is the current implementation priority. Dimension/PPT classical-value reductions
+The M0 claim/evidence fragment is implemented for the standard unrestricted
+resource chain; see [claims](claims.md). M1 is the current implementation priority.
+Dimension/PPT classical-value reductions
 remain useful theorem-backed inference rules for M2. Broader NPA, quantum inflation,
 and trusted/sequential interfaces are selected when a discovery experiment requires
 them; their existence is not itself a reason to expand the dependency set.

@@ -1,0 +1,85 @@
+"""Admission of data artifacts through specific independently replayed checks."""
+import json
+from math import prod
+
+from ..core.game import rational
+from ..core.identity import canonical_json, verifier_id
+from ..core.resources import Resource, ResourceSpec
+from .artifacts import EvidenceArtifact, EvidenceKind
+from .types import EvidenceCheck, EvidenceError, ExecutionStatus, VerificationBudget
+
+
+def _fields(payload, expected):
+    if not isinstance(payload, dict) or set(payload) != set(expected):
+        raise ValueError('Unexpected evidence payload fields')
+
+
+def verify_artifact(game, artifact, *, budget=None):
+    """Recompute evidence; a supplied AnalysisResult or guarantee label is never trusted."""
+    budget = VerificationBudget() if budget is None else budget
+    if not isinstance(budget, VerificationBudget):
+        raise TypeError('Expected VerificationBudget')
+    if not isinstance(artifact, EvidenceArtifact):
+        raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, 'Expected a data EvidenceArtifact, not a result or verified-bound object')
+    size = len(artifact.resource_json.encode('utf-8')) + len(artifact.payload_json.encode('utf-8'))
+    if size > budget.max_artifact_bytes or artifact.nbytes > budget.max_artifact_bytes:
+        raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Evidence exceeds max_artifact_bytes')
+    identifier = artifact.artifact_id
+    if artifact.game_id != verifier_id(game):
+        raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, 'Evidence belongs to a different verifier', identifier)
+    try:
+        source = json.loads(artifact.resource_json)
+        resource = ResourceSpec(Resource(source['kind']))
+        payload = artifact.payload
+        if artifact.kind == EvidenceKind.NUMERICAL_HINT:
+            if not isinstance(payload, dict):
+                raise ValueError('A numerical hint must be a data object')
+            return EvidenceCheck(identifier, resource.kind, None, None, 'untrusted_observation.v1', False)
+        from ..core.resource_serialization import resource_to_dict
+        if artifact.resource_json != canonical_json(resource_to_dict(resource)):
+            raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'Proof admission currently supports only standard unrestricted resource models', identifier)
+        if artifact.kind in (EvidenceKind.LOCAL_STRATEGY, EvidenceKind.LOCAL_ENUMERATION):
+            if resource.kind != Resource.LOCAL:
+                raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'Local evidence must declare the standard local source model', identifier)
+            if artifact.kind == EvidenceKind.LOCAL_ENUMERATION:
+                counts = tuple(a**x for x, a in zip(game.scenario.input_sizes, game.scenario.output_sizes))
+                if prod(counts)//max(counts) > budget.max_strategies:
+                    raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Classical replay exceeds max_strategies', identifier)
+            from ..classical import DeterministicStrategy
+            _fields(payload, {'strategy'} if artifact.kind == EvidenceKind.LOCAL_STRATEGY else {'strategy', 'value'})
+            witness = DeterministicStrategy(game.scenario, payload['strategy'])
+            lower = witness.score(game)
+            if artifact.kind == EvidenceKind.LOCAL_STRATEGY:
+                return EvidenceCheck(identifier, resource.kind, lower, None, 'deterministic_score.v1')
+            from ..analysis.classical import classical_value
+            exact = classical_value(game, max_strategies=budget.max_strategies)
+            if lower != exact.value or rational(payload['value']) != exact.value:
+                raise ValueError('Local enumeration payload does not match independent exact replay')
+            return EvidenceCheck(identifier, resource.kind, exact.value, exact.value, 'local_enumeration_replay.v1')
+        if artifact.kind == EvidenceKind.NONSIGNALLING_LP:
+            if resource.kind != Resource.NONSIGNALLING:
+                raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'NS certificates must declare the standard nonsignalling source model', identifier)
+            _fields(payload, {'primal', 'dual'})
+            if game.scenario.entries > budget.max_variables:
+                raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'NS verification exceeds max_variables', identifier)
+            from ..analysis.certificates import verify_nonsignalling_certificate
+            result = verify_nonsignalling_certificate(game, payload['primal'], payload['dual'], max_variables=budget.max_variables)
+            return EvidenceCheck(identifier, resource.kind, result.diagnostics['lower_bound'],
+                                  result.diagnostics['upper_bound'], 'rational_ns_lp.v1')
+        if artifact.kind == EvidenceKind.XOR_DUAL:
+            if resource.kind != Resource.QUANTUM_COMMUTING:
+                raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'XOR duals use the standard commuting upper-bound source model', identifier)
+            if sum(game.scenario.input_sizes) > budget.max_matrix_size:
+                raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'XOR verification exceeds max_matrix_size', identifier)
+            from ..certificates.xor import verify_xor_certificate
+            result = verify_xor_certificate(game, payload, max_matrix_size=budget.max_matrix_size)
+            return EvidenceCheck(identifier, resource.kind, None, result.value, 'rational_xor_dual.v1')
+        raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'No verifier is registered for this evidence kind', identifier)
+    except EvidenceError:
+        raise
+    except ImportError as error:
+        raise EvidenceError(ExecutionStatus.DEPENDENCY_UNAVAILABLE, str(error), identifier) from error
+    except RuntimeError as error:
+        raise EvidenceError(ExecutionStatus.CHECKER_ERROR, str(error), identifier) from error
+    except (TypeError, ValueError, KeyError, OverflowError) as error:
+        raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, str(error), identifier) from error

@@ -1,0 +1,122 @@
+# Claims, evidence, and verification admission
+
+The claim layer asks precise questions about a resource value, rather than
+interpreting a solver's status as a mathematical answer. A value is a supremum;
+a value of one does not by itself assert an attained perfect strategy.
+
+`ValueClaim(resource, relation, threshold)` uses `at_least` or `at_most` and an
+exact threshold. `GapClaim(higher, lower, threshold=0)` asks whether the difference
+of the two resource values is strictly greater than a nonnegative exact threshold.
+Floats and Boolean thresholds are rejected; use integers, Fractions, or rational
+strings. These definitions do not assert pseudo-telepathy or self-testing.
+
+## Truth and execution
+
+| Field | Values | Interpretation |
+|---|---|---|
+| `truth` | `proved`, `disproved`, `unknown` | Mathematical verdict for the precise claim |
+| `execution` | `completed`, `unsupported`, `budget_exceeded`, `invalid_evidence`, `conflict`, `checker_error`, `dependency_unavailable` | Outcome of the verification/inference procedure |
+
+Only completed execution may return a proved or disproved verdict. An empty or
+insufficient evidence set can complete successfully with an unknown verdict.
+Conflicting checked bounds quarantine inference as unknown/conflict: no preferred
+solver or convenient bound is selected to conceal the contradiction.
+
+The initial inference rules use only the unrestricted standard models:
+
+`local ⊆ quantum_finite ⊆ quantum_closure ⊆ quantum_commuting ⊆ nonsignalling`.
+
+A lower bound propagates toward larger sets, and an upper bound toward smaller
+sets. This is a value rule, not a membership or attainment rule. Dimension bounds,
+fixed states, source networks, PPT/projective restrictions, and nondefault
+randomness policies remain available to the analysis APIs, but claim inference
+returns unsupported until an explicit rule covers them. Numerical hints may
+retain such a restricted source context without contributing mathematical bounds.
+
+For an interval `[L,U]`, `value >= t` is proved by `L >= t` and disproved by
+`U < t`; `value <= t` is proved by `U <= t` and disproved by `L > t`.
+For a strict gap, proof needs `L_high - U_low > threshold`; disproof needs
+`U_high - L_low <= threshold`. Equality at the threshold is not a strict gap.
+
+## Data artifacts are not automatically proofs
+
+`EvidenceArtifact` snapshots a versioned kind, exact verifier ID, complete source
+resource representation, and data payload as immutable canonical JSON strings.
+The resource and artifact IDs are recomputed on decoding. Duplicate fields,
+nonfinite JSON values, changed IDs, unknown fields, and oversized envelopes are
+rejected. Decoded payloads are fresh objects; modifying them cannot mutate the
+artifact. Hashes establish content identity, not mathematical truth or authorship.
+
+`verify_artifact` rechecks the payload against the actual game. The current registry is:
+
+| Evidence kind | Source resource | Payload | Admitted facts |
+|---|---|---|---|
+| `local_strategy` | Standard local | `strategy`: deterministic response tables | Exact local lower bound only |
+| `local_enumeration` | Standard local | `strategy`, exact `value` string | Lower and upper after independent exhaustive replay |
+| `nonsignalling_lp` | Standard nonsignalling | Rational-string `primal` and `dual` arrays | Exact NS lower/upper feasibility bounds |
+| `xor_dual` | Standard commuting quantum | Existing fingerprinted XOR dual certificate | Exact commuting upper bound, also applicable downward |
+| `numerical_hint` | Recorded source context | JSON observation object | No certified bounds, regardless of asserted labels |
+
+The equality-dual XOR certificate bounds commuting strategies for its supported
+parity score. Declaring its source as nonsignalling would be a different claim
+and is rejected. Conversely, an NS primal lower bound is never propagated into
+the quantum sets. Canonical CHSH symbolic results are not automatically admitted
+as general game evidence; theorem-specific binding/transport needs its own rule.
+
+External `AnalysisResult` objects and externally constructed checker-output
+objects are not evidence inputs. The `Guarantee` enum validates vocabulary and
+scalar types, but an `exact` label does not establish a fact. Numerical hints
+remain hints even if their payload falsely contains `guarantee="exact"`.
+
+## Example
+
+```python
+from fractions import Fraction
+from nonlocalgames import ResourceSpec
+from nonlocalgames.analysis import classical_value, certify_nonsignalling
+from nonlocalgames.claims import EvidenceKind, GapClaim, assess_gap, make_evidence
+from nonlocalgames.games import chsh
+
+game = chsh()
+local = classical_value(game)
+ns = certify_nonsignalling(game)
+evidence = [
+    make_evidence(game, ResourceSpec("local"), EvidenceKind.LOCAL_ENUMERATION,
+                  {"strategy": local.witness, "value": str(local.value)}),
+    make_evidence(game, ResourceSpec("nonsignalling"), EvidenceKind.NONSIGNALLING_LP,
+                  {key: list(map(str, ns.witness[key])) for key in ("primal", "dual")}),
+]
+claim = GapClaim(ResourceSpec("quantum_finite"), ResourceSpec("local"), Fraction(0))
+result = assess_gap(game, claim, evidence)
+assert result.truth == "unknown"  # NS value 1 does not prove quantum advantage.
+ns_claim = GapClaim(ResourceSpec("nonsignalling"), ResourceSpec("local"))
+assert assess_gap(game, ns_claim, evidence).truth == "proved"
+```
+
+`ValueClaim` uses the same evidence with `assess_value`. Returned intervals retain
+the IDs supporting their tightest bounds. `checks` records checker identities,
+versions, source models, and admitted bounds; numerical observations are separate.
+
+`evidence_to_dict/from_dict` preserve raw evidence envelopes. `claim_to_dict` and
+`claim_from_dict` bind a definition to its verifier; `assessment_to_dict` writes a
+receipt. An assessment receipt is not a standalone proof: archive its definition
+and raw artifacts, then rerun inference with the trusted checker.
+
+Run `python scripts/claim_demo.py > output/claim-demo.json` for CHSH, GYNI, and
+constant-score examples. The demo includes deliberately untrusted numerical
+labels and records unknown quantum gaps rather than promoting them to theorems.
+
+## Budgets and trust boundary
+
+`VerificationBudget` limits artifact count, full-envelope bytes, local strategies,
+NS variables, and exact PSD matrix size. These are count/size limits per artifact,
+not a global wall-clock guarantee; rational coefficient bit complexity matters.
+The caller chooses budgets, and payloads cannot override them. Exhaustion is not
+a negative mathematical result. Wider execution isolation belongs to the later
+batch workflow.
+
+The trusted boundary includes game/resource semantics, exact model lowering,
+resource-inclusion rules, parsing, arithmetic, and checker implementation. This is
+independent certificate checking, not a proof-assistant formalization. Differential
+and adversarial tests remain necessary, including tests of model compilers shared
+between numerical discovery and exact verification.

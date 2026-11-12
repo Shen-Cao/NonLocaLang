@@ -19,6 +19,10 @@ def evaluate(task, strategy):
     if isinstance(strategy, QuantumStrategy):
         from ..quantum.validation import evaluate as evaluate_quantum
         return evaluate_quantum(task, strategy)
+    from ..quantum.exact import ExactQuantumStrategy
+    if isinstance(strategy, ExactQuantumStrategy):
+        from ..quantum.exact.evaluation import evaluate as evaluate_exact
+        return evaluate_exact(task, strategy)
     local = r.kind == Resource.LOCAL
     product = (r.kind == Resource.QUANTUM_FINITE and r.state_constraint == StateConstraint.PRODUCT
                and r.fixed_state is None)

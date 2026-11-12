@@ -22,6 +22,9 @@ def witness_to_dict(witness):
         return quantum_to_dict(witness)
     if isinstance(witness, QuantumStrategy):
         return strategy_to_dict(witness)
+    from .quantum.exact import ExactQuantumStrategy, strategy_to_dict as exact_to_dict
+    if isinstance(witness, ExactQuantumStrategy):
+        return exact_to_dict(witness)
     return witness
 
 

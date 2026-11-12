@@ -4,6 +4,7 @@ from fractions import Fraction
 from itertools import product
 from math import prod
 from numbers import Integral
+from operator import index
 from typing import Callable, Mapping
 
 Profile = tuple[int, ...]
@@ -13,7 +14,9 @@ def rational(value) -> Fraction:
     """Accept exact numbers; require explicit conversion of floating-point data."""
     if isinstance(value, (float, complex)):
         raise TypeError("Use Fraction or a rational string, not floating-point game data")
-    return Fraction(value)
+    result = Fraction(value)
+    # Fraction(Rational) may retain bounded integer components from array libraries.
+    return Fraction(index(result.numerator), index(result.denominator))
 
 
 def _sizes(values):

@@ -1,10 +1,11 @@
 """Exact coefficient conventions shared by XOR optimization and verification."""
 from fractions import Fraction
-import hashlib
-import json
 
 from ..core.game import Game
+from ..core.identity import verifier_digest as game_fingerprint
 from .linalg import positive_integer
+
+__all__ = ["xor_coefficients", "cost_matrix", "game_fingerprint"]
 
 
 def xor_coefficients(game, *, max_matrix_size=128):
@@ -40,13 +41,3 @@ def cost_matrix(weights):
         for y in range(n):
             matrix[x][m+y] = matrix[m+y][x] = weights[x][y] / 2
     return tuple(tuple(row) for row in matrix)
-
-
-def game_fingerprint(game):
-    """Bind certificate data to exact verifier tables and alphabets, excluding its name."""
-    payload = {"input_sizes": game.scenario.input_sizes,
-               "output_sizes": game.scenario.output_sizes,
-               "distribution": tuple(map(str, game.distribution)),
-               "payoff": tuple(map(str, game.payoff))}
-    encoded = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
-    return hashlib.sha256(encoded).hexdigest()

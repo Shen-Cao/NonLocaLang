@@ -36,4 +36,7 @@ def matrix_from_dict(data, dimension):
         if not finite:
             raise ValueError("Numerical matrices must contain only finite numbers")
     import numpy as np
-    return np.asarray(data["real"], dtype=float) + 1j * np.asarray(data["imag"], dtype=float)
+    matrix = np.empty((dimension, dimension), dtype=complex)
+    matrix.real = np.asarray(data["real"], dtype=float)
+    matrix.imag = np.asarray(data["imag"], dtype=float)
+    return matrix

@@ -27,7 +27,7 @@ appropriate optimizer exists.
 | Guarantee | Meaning |
 |---|---|
 | `exact` | Exact local optimization, or verified rational primal/dual optima that coincide |
-| `certified_upper_bound` | Verified rational upper bound with a feasible rational lower witness; inspect the interval |
+| `certified_upper_bound` | Verified rational upper bound; a lower witness or interval is included only when separately verified |
 | `numerical_optimum` | Floating optimum of the stated mathematical program; numerical error is not certified |
 | `numerical_relaxation` | Floating estimate of an outer-relaxation optimum; not a certified upper bound |
 

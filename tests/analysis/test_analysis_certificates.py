@@ -82,3 +82,64 @@ def test_exact_verifier_rejects_bad_primal_and_dual_and_records_gap():
         _verify_rational_lp(matrix, [1], coefficients, (Fraction(1), Fraction(1)), (Fraction(-1),))
     with pytest.raises(ValueError, match="inequality"):
         _verify_rational_lp(matrix, [1], coefficients, (Fraction(1), Fraction(0)), (Fraction(0),))
+
+
+@pytest.mark.parametrize('oversized', ['primal', 'dual'])
+def test_checker_bounds_infinite_vectors_before_conversion_and_allocation(monkeypatch, oversized):
+    from itertools import repeat
+    import nonlocalgames.analysis.certificates as certificates
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('invalid vector lengths must fail before conversion or sparse allocation')
+
+    monkeypatch.setattr(certificates, 'rational', forbidden)
+    monkeypatch.setattr(certificates, '_nonsignalling_program', forbidden)
+    primal = repeat(object()) if oversized == 'primal' else [object()]*16
+    dual = repeat(object()) if oversized == 'dual' else [object()]*12
+    with pytest.raises(ValueError, match=f'{oversized} dimensions'):
+        verify_nonsignalling_certificate(chsh(), primal, dual)
+
+
+def test_checker_consumes_at_most_expected_length_plus_one(monkeypatch):
+    import nonlocalgames.analysis.certificates as certificates
+    consumed = []
+
+    def too_long():
+        for index in range(17):
+            consumed.append(index)
+            yield object()
+        pytest.fail('checker consumed beyond the bounded dimension probe')
+
+    monkeypatch.setattr(certificates, 'rational', lambda value: pytest.fail('must reject size first'))
+    with pytest.raises(ValueError, match='primal dimensions'):
+        verify_nonsignalling_certificate(chsh(), too_long(), [0]*12)
+    assert consumed == list(range(17))
+
+
+@pytest.mark.parametrize('budget', [15, 0, -1, True, 1.5])
+def test_checker_rejects_invalid_or_insufficient_budget_before_touching_vectors(monkeypatch, budget):
+    import nonlocalgames.analysis.certificates as certificates
+
+    class Untouched:
+        def __iter__(self):
+            pytest.fail('budget failure must not inspect certificate iterables')
+
+    monkeypatch.setattr(certificates, '_nonsignalling_program',
+                        lambda *args, **kwargs: pytest.fail('budget failure must precede allocation'))
+    with pytest.raises(ValueError, match='limit|positive integer'):
+        verify_nonsignalling_certificate(chsh(), Untouched(), Untouched(), max_variables=budget)
+
+
+@pytest.mark.parametrize('inputs, outputs', [
+    ((1,), (1,)), ((3,), (2,)), ((3, 2), (1, 3)),
+    ((2, 1, 2), (2, 3, 1)), ((2, 2, 2), (2, 2, 2)),
+])
+def test_preflight_accepts_valid_certificates_for_heterogeneous_scenarios(inputs, outputs):
+    from math import prod
+    from nonlocalgames import Game, Scenario
+    from nonlocalgames.analysis.nonsignalling import _nonsignalling_program
+    game = Game.from_rule(Scenario(inputs, outputs), lambda x, a: 0)
+    _, rhs = _nonsignalling_program(game, 100_000)
+    primal = (Fraction(1, prod(outputs)),) * game.scenario.entries
+    result = verify_nonsignalling_certificate(game, iter(primal), (0 for _ in rhs))
+    assert result.value == 0 and result.guarantee == 'exact'

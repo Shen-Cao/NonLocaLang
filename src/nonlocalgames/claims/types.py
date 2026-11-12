@@ -69,6 +69,11 @@ class VerificationBudget:
     max_matrix_size: int = 128
     max_artifact_bytes: int = 8_000_000
     max_artifacts: int = 100
+    max_quantum_joint_dimension: int = 16
+    max_quantum_entries: int = 100_000
+    max_quantum_events: int = 100_000
+    max_quantum_parties: int = 32
+    max_quantum_scalar_bits: int = 4096
 
     def __post_init__(self):
         for name in self.__dataclass_fields__:

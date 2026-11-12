@@ -64,3 +64,21 @@ def test_genuine_three_outcome_quantum_violation_and_moment_completeness():
                                 matrix[:, [index[word] for word in joint]].sum(axis=1),
                                 matrix[:, index[(other,)]], atol=2e-6,
                             )
+
+
+def test_complex_nonbinary_candidate_yields_a_certified_quantum_gap():
+    from fractions import Fraction
+    from nonlocalgames import ResourceSpec
+    from nonlocalgames.analysis import certify_quantum_lower_bound
+    from nonlocalgames.claims import EvidenceKind, GapClaim, assess_gap, make_evidence
+    game = _cglmp3()
+    local = classical_value(game)
+    lower = certify_quantum_lower_bound(game, _cglmp3_strategy(), repair_steps=24)
+    assert local.value == 2 and lower.value > Fraction(29, 10)
+    artifacts = [make_evidence(game, ResourceSpec('local'), EvidenceKind.LOCAL_ENUMERATION,
+                               {'strategy': local.witness, 'value': str(local.value)}),
+                 make_evidence(game, ResourceSpec('quantum_finite'), EvidenceKind.QUANTUM_STRATEGY,
+                               lower.witness)]
+    claim = GapClaim(ResourceSpec('quantum_finite'), ResourceSpec('local'), Fraction(9, 10))
+    checked = assess_gap(game, claim, artifacts)
+    assert checked.truth == 'proved' and checked.execution == 'completed'

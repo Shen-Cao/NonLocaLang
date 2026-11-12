@@ -14,6 +14,24 @@ def _fields(payload, expected):
         raise ValueError('Unexpected evidence payload fields')
 
 
+def _quantum_policy(game, budget, identifier):
+    try:
+        from ..quantum.exact import ExactBudget, ExactBudgetExceeded, validate_game_scalars
+    except ImportError as error:
+        raise EvidenceError(ExecutionStatus.DEPENDENCY_UNAVAILABLE, str(error), identifier) from error
+    policy = ExactBudget(max_joint_dimension=budget.max_quantum_joint_dimension,
+                         max_psd_size=budget.max_matrix_size,
+                         max_matrix_entries=budget.max_quantum_entries,
+                         max_events=budget.max_quantum_events,
+                         max_parties=budget.max_quantum_parties,
+                         max_scalar_bits=budget.max_quantum_scalar_bits)
+    try:
+        validate_game_scalars(game, policy)
+    except ExactBudgetExceeded as error:
+        raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
+    return policy
+
+
 def verify_artifact(game, artifact, *, budget=None):
     """Recompute evidence; a supplied AnalysisResult or guarantee label is never trusted."""
     budget = VerificationBudget() if budget is None else budget
@@ -25,6 +43,7 @@ def verify_artifact(game, artifact, *, budget=None):
     if size > budget.max_artifact_bytes or artifact.nbytes > budget.max_artifact_bytes:
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Evidence exceeds max_artifact_bytes')
     identifier = artifact.artifact_id
+    quantum_policy = _quantum_policy(game, budget, identifier) if artifact.kind == EvidenceKind.QUANTUM_STRATEGY else None
     if artifact.game_id != verifier_id(game):
         raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, 'Evidence belongs to a different verifier', identifier)
     try:
@@ -66,6 +85,17 @@ def verify_artifact(game, artifact, *, budget=None):
             result = verify_nonsignalling_certificate(game, payload['primal'], payload['dual'], max_variables=budget.max_variables)
             return EvidenceCheck(identifier, resource.kind, result.diagnostics['lower_bound'],
                                   result.diagnostics['upper_bound'], 'rational_ns_lp.v1')
+        if artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
+            if resource.kind != Resource.QUANTUM_FINITE:
+                raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'Quantum strategy certificates use the standard finite tensor-product source model', identifier)
+            from ..quantum.exact import ExactBudgetExceeded
+            from ..certificates.quantum import verify_quantum_lower_certificate
+            try:
+                result = verify_quantum_lower_certificate(game, payload, budget=quantum_policy,
+                                                          max_bytes=budget.max_artifact_bytes)
+            except ExactBudgetExceeded as error:
+                raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
+            return EvidenceCheck(identifier, resource.kind, result.value, None, 'rational_quantum_strategy.v1')
         if artifact.kind == EvidenceKind.XOR_DUAL:
             if resource.kind != Resource.QUANTUM_COMMUTING:
                 raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'XOR duals use the standard commuting upper-bound source model', identifier)

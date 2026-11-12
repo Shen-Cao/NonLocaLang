@@ -19,6 +19,7 @@ class EvidenceKind(StrEnum):
     NONSIGNALLING_LP = "nonsignalling_lp"
     XOR_DUAL = "xor_dual"
     NUMERICAL_HINT = "numerical_hint"
+    QUANTUM_STRATEGY = "quantum_strategy"
 
 
 def _budget(max_bytes):

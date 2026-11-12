@@ -65,30 +65,20 @@ Public identifiers are also stored in `report/bibliography.bib`. Downloaded
 copies may be cached in the ignored `references/` directory; none is required
 to build or use the tracked project.
 
-## Next research milestones
+## Development priorities
 
-1. **Structure-preserving constructors.** Add linear-system, graph, and
-   synchronous-game families. Compare symbolic description size, table size,
-   compilation time, and backend cost. A tiny predicate can expand into an
-   enormous table; retain it when a specialized solver can consume it.
-2. **Broader independent certificates.** Extend the rational non-signalling
-   LP, network-violation, and symbolic CHSH checkers to SDP duals and more general
-   SOS decompositions, then verify them with exact or interval arithmetic.
-   Keep the discovery process outside the trusted checker.
-3. **Composition of rigidity.** Establish conditions under which saturation
-   relations from component games admit compatible local extraction maps.
-   Track how mixture weights and dimension costs affect robustness.
-4. **General independent-source compatibility.** Add an Inflation adapter
-   and broader compatibility methods beyond the implemented source witnesses,
-   bilocal/triangle inequalities, source-disjoint marginal checks, and exact
-   no-input chain reconstruction. Keep global shared randomness explicit;
-   ordinary Bell backends must not replace source-independence constraints.
-5. **Trusted and sequential interfaces.** Add semiquantum states and causal
-   channels as typed objects. Demonstrate a faithful lowering on one restricted
-   example before generalizing.
-6. **Experimental and cryptographic metrics.** Introduce explicit noise,
-   sampling, detection, memory, and adversary models. Winning-probability gaps
-   alone do not establish statistical significance or secret randomness.
+The [discovery workflow roadmap](roadmap.md) is the implementation queue. It
+prioritizes claim/evidence semantics and exact quantum lower witnesses before
+property verdicts, canonical transport, batch discovery, and optional adapters.
+The scientific extension questions remain:
+
+- Which structured constructors preserve useful algebra through lowering?
+- How can certificates and extraction guarantees compose under checked maps?
+- Which resource restrictions admit cheap exact reductions or useful bounds?
+- Which network, trusted-interface, or sequential fragment is required by a
+  concrete experiment, and what additional semantics must its backend preserve?
+- How can sampling, noise, and adversary assumptions support statistically and
+  cryptographically meaningful conclusions beyond a score gap?
 
 The resource extension also proves that external convexification preserves
 linear values, gives an exact product-resource value reduction when no

@@ -16,9 +16,12 @@ def resource_to_dict(resource):
     state = None if fixed is None else {"encoding": "complex_float64",
             "dimensions": list(fixed.dimensions), "tolerance": float(fixed.tolerance),
             "real": fixed.state.real.tolist(), "imag": fixed.state.imag.tolist()}
-    from ..networks.serialization import network_to_dict
+    network = None
+    if resource.network is not None:
+        from ..networks.serialization import network_to_dict
+        network = network_to_dict(resource.network)
     return {"schema": RESOURCE_SCHEMA, "kind": resource.kind.value,
-            "network": None if resource.network is None else network_to_dict(resource.network),
+            "network": network,
             "local_dimensions": None if resource.local_dimensions is None else list(resource.local_dimensions),
             "shared_randomness": resource.shared_randomness.value,
             "state_constraint": resource.state_constraint.value,
@@ -51,8 +54,10 @@ def resource_from_dict(data, *, max_joint_dimension=1024, max_matrix_entries=1_0
             raise ValueError("Fixed state exceeds max_matrix_entries")
         matrix = matrix_from_dict({"real": fixed["real"], "imag": fixed["imag"]}, size)
         fixed = FixedState(matrix, dimensions, fixed["tolerance"])
-    from ..networks.serialization import network_from_dict
-    network = None if data["network"] is None else network_from_dict(data["network"])
+    network = None
+    if data["network"] is not None:
+        from ..networks.serialization import network_from_dict
+        network = network_from_dict(data["network"])
     return ResourceSpec(data["kind"], data["local_dimensions"], network=network,
                         shared_randomness=data["shared_randomness"], state_constraint=data["state_constraint"],
                         measurement_class=data["measurement_class"], ppt_cuts=data["ppt_cuts"], fixed_state=fixed)

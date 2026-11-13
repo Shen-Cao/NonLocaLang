@@ -127,3 +127,7 @@ The active development order is recorded in the [discovery roadmap](docs/roadmap
 The [claim layer](docs/claims.md) separates proved/disproved/unknown statements from
 execution status and independently admits data evidence. [Optional backends](docs/backends.md)
 remain isolated from the base Python package.
+
+The [property layer](docs/properties.md) recognizes exact verifier structure and
+checks perfect-strategy/pseudotelepathy claims from admitted attainment evidence.
+Use `python -m nonlocalgames property --help` for the bounded command-line interface.

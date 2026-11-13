@@ -1,0 +1,55 @@
+\section{Structural properties and witnessed perfect play}
+\label{sec:properties}
+
+A property query must specify the mathematical predicate before selecting an
+analysis method. Structural predicates inspect rational verifier data: acceptance
+rewards, Boolean winning conditions, and dependence only on the parity of binary
+answers. An XOR score can have constant or signed parity rewards; an XOR winning
+predicate accepts exactly one parity at each selected question. These notions
+apply at arbitrary party count and do not themselves license the two-party vector
+SDP. The question domain is explicit: all stored inputs or only the positive-mass
+sampling support.
+
+Perfect play concerns the sampled game and requires acceptance rewards on that
+support. It is an attainment statement, not merely the equality of a supremum
+with one. The initial property fragment considers ordinary local and finite
+tensor-product quantum strategies. More restrictive resources and self-testing
+claims require additional rules rather than an inferred Boolean result.
+
+\begin{proposition}[Sufficient property evidence]
+For an acceptance game, a verified finite quantum strategy with score one proves
+finite quantum perfectness, while a checked quantum upper bound below one
+excludes it. A verified perfect local strategy also gives a perfect finite quantum
+strategy by using one-dimensional systems and identity/zero effects. A perfect
+finite quantum strategy together with a checked local upper bound below one proves
+pseudotelepathy. Either a perfect local strategy or exclusion of quantum perfectness
+refutes pseudotelepathy.
+\end{proposition}
+\begin{proof}
+The point certificates establish admissible attained scores directly. An upper
+bound below one excludes every score-one realization in its stated model.
+Deterministic local responses have the indicated finite quantum embedding.
+Pseudotelepathy is the conjunction of finite quantum perfectness and the absence
+of a perfect local strategy, so the remaining conclusions follow.
+\end{proof}
+A nonsignalling score-one point is not a quantum point. A generic lower bound of
+one is likewise not an attainment certificate; nonclosed quantum correlation sets
+make the distinction substantive \cite{slofstra2019}. Numerical rank and optimizer
+uniqueness do not repair this missing implication. The property engine therefore
+records checked attainment as a separate fact and keeps its originating resource.
+
+Every admitted attained score also supplies a lower value bound. This fact is
+included in consistency checking even if a future producer omits a separate lower
+bound field. For acceptance games, checked lower bounds above one, upper bounds
+below zero, or attained scores outside $[0,1]$ are contradictory premises and
+quarantine the assessment. Loose bounds outside that interval in the opposite
+direction are not contradictions. Absence of a proof remains unknown; it is not
+evidence that the property is false.
+
+All property definitions bind to the exact verifier and support convention.
+Structural counterexamples record locations and reasons that can be replayed on
+the input data. Evidence-backed assessments recheck raw artifacts through the same
+admission layer as value claims. Invalid, unsupported, exhausted, or conflicting
+checks produce operational outcomes separate from mathematical verdicts. Receipts
+are not standalone proof tokens, and no general strategy-discovery procedure is
+launched implicitly by property assessment.

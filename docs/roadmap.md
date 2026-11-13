@@ -17,7 +17,9 @@ to preventing an incorrect mathematical claim.
 
 The M0 claim/evidence fragment is implemented for the standard unrestricted
 resource chain; see [claims](claims.md). M1 now supplies
-[exact quantum lower witnesses](exact-quantum.md). M2 is the next queued milestone.
+[exact quantum lower witnesses](exact-quantum.md). M2 is in progress: the [narrow property layer](properties.md) is implemented.
+Bounded scalar wire decoding is the next input-boundary prerequisite, followed
+by checked relabellings and canonical representatives.
 Dimension/PPT classical-value reductions
 remain useful theorem-backed inference rules for M2. Broader NPA, quantum inflation,
 and trusted/sequential interfaces are selected when a discovery experiment requires

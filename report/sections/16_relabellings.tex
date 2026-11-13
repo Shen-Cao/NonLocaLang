@@ -1,0 +1,76 @@
+\section{Checked local relabellings}
+\label{sec:relabellings}
+
+Relabellings remove coordinate choices without changing the experimental
+information. They are a restricted part of the broader theory of local
+transformations, which also includes irreversible maps and alphabet-changing
+liftings \cite{rosset2020transformations}. A relabelling must move a resource
+contract as well as a score table whenever party roles are asymmetric.
+
+\begin{definition}[Directed relabelling]
+Let $\pi$ assign each new party $i$ to an old party $\pi(i)$. Let $\tau_i$
+be a bijection from its new questions to the old questions, and let
+$\sigma_{i,x'}$ be a bijection of answers for each new local question $x'$.
+For new profiles $(x',a')$, define the old profiles by
+\[
+ x_{\pi(i)}=\tau_i(x'_i),\qquad
+ a_{\pi(i)}=\sigma_{i,x'_i}(a'_i).
+\]
+The transported game and behavior satisfy
+\[
+ \mu'(x')=\mu(x),\qquad V'(a',x')=V(a,x),\qquad
+ p'(a'\mid x')=p(a\mid x).
+\]
+\end{definition}
+
+Both verifier tables are retained separately, even outside the sampling support.
+The inverse answer map at old question $x$ is
+$\sigma_{i,\tau_i^{-1}(x)}^{-1}$; inverting each answer permutation without
+changing its question index would be incorrect. For a second relabelling
+$(\kappa,\eta,\theta)$ applied after the first, composition is
+\begin{align*}
+ \pi_{\mathrm{comp}}(k)&=\pi(\kappa(k)),\\
+ \tau^{\mathrm{comp}}_k(z)&=\tau_{\kappa(k)}(\eta_k(z)),\\
+ \sigma^{\mathrm{comp}}_{k,z}(c)&=
+ \sigma_{\kappa(k),\eta_k(z)}(\theta_{k,z}(c)).
+\end{align*}
+
+\begin{proposition}[Resource-aware score equivalence]
+Transport local dimension bounds by $d'_i=d_{\pi(i)}$, PPT cuts by
+$\pi^{-1}$, fixed-state tensor factors by $\pi$, and source endpoints by
+$\pi^{-1}$ while preserving source and endpoint-position order. With these
+transported contracts, relabelling gives a score-preserving bijection of the
+implemented strategy models. Consequently the resource values agree, and
+existence of an attaining strategy is preserved.
+\end{proposition}
+\begin{proof}
+Change variables by the input and output bijections in the finite score sum.
+Every term, including its sampling weight, is unchanged. Deterministic responses
+transform as $f'_i(x')=\sigma_{i,x'}^{-1}(f_{\pi(i)}(\tau_i(x')))$.
+For quantum strategies use
+$M'_{i,a'\mid x'}=M_{\pi(i),\sigma_{i,x'}(a')\mid\tau_i(x')}$
+and the corresponding tensor-factor permutation of the state. Born traces,
+positivity, and POVM sums are preserved. Dimensions and partial-transpose
+conditions follow the same factor renaming. Independent source laws or states
+are unchanged, with only their recipient labels renamed. The inverse maps
+recover every strategy. Commuting models can rename their observable families,
+and the same finite coordinate permutation preserves nonsignalling constraints
+and closures. Equality of suprema follows without assuming their attainment.
+\end{proof}
+
+This statement concerns mathematical resource sets. Numerical matrix validation
+can fail after an exact entry permutation because eigensolver rounding changes
+at a tolerance boundary. The implementation reports that failure at the original
+tolerance; it neither repairs the state nor enlarges its acceptance threshold.
+Party-coordinate permutations are not asserted to be local physical swap channels.
+
+Evidence transport verifies a raw source certificate, constructs new witness
+data, and rechecks a fresh certificate against the target verifier. Deterministic
+and exact quantum witnesses use the formulas above. For bipartite XOR scores,
+answer flips conjugate the Gram cost by a diagonal sign matrix, while party and
+question relabellings permute its nodes. The dual diagonal follows the node
+permutation; target PSD verification establishes the new upper certificate.
+Local optimality artifacts retain independent enumeration replay. Nonsignalling
+equality-dual and oriented spiral-copy rows require additional translation rules
+and are not transported by changing hashes. Provenance receipts remain separate
+from evidence admitted by the claim engine.

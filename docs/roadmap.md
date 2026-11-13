@@ -18,12 +18,12 @@ to preventing an incorrect mathematical claim.
 The M0 claim/evidence fragment is implemented for the standard unrestricted
 resource chain; see [claims](claims.md). M1 now supplies
 [exact quantum lower witnesses](exact-quantum.md). M2 is in progress: the
-[narrow property layer](properties.md) and [bounded scalar wire decoding](scalar-wire.md)
-are implemented. The remaining stages are:
+[narrow property layer](properties.md), [bounded scalar wire decoding](scalar-wire.md),
+and [checked relabellings](equivalence.md) are implemented. Canonical orbit
+representatives remain the next stage:
 
 | Stage | Deliverable | Acceptance gate |
 |---|---|---|
-| M2b: checked relabellings | Invertible local/party maps, resource and witness transport, and independently rechecked supported certificates | Sampling and promise rows survive; tensor factors, PPT cuts, and source ports move consistently; unsupported certificate transforms fail explicitly |
 | M2c: canonical XOR corpus | Complete canonicalization of uniform bipartite 3×3 XOR predicates, with an explicit transporter | All 512 predicates form exactly three orbits; budget exhaustion never produces a canonical identity |
 
 Dimension/PPT classical-value reductions

@@ -23,7 +23,8 @@ numerical claims; exact fractions and algebraic identities compare exactly.
 
 Regression tests are grouped under `tests/core`, `tests/analysis`,
 `tests/certificates`, `tests/classical`, `tests/quantum`, `tests/networks`, and
-`tests/cli`; pytest discovers these recursively. Importlib test loading keeps
+`tests/cli`, `tests/claims`, `tests/properties`, and `tests/equivalence`; pytest
+discovers these recursively. Importlib test loading keeps
 module names isolated across these directories; shared fixtures belong in
 `conftest.py` rather than cross-imported test modules.
 

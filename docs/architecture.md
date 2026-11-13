@@ -75,8 +75,9 @@ adapter or a separately validated generator rather than extending ad hoc formula
 
 ## Transform contracts
 
-- Local bijective input/output relabelling preserves values for the implemented
-  resource sets. Output permutations may depend on the local input.
+- [Checked local and party relabelling](equivalence.md) preserves values when the
+  resource contract follows the same party renaming. Output permutations may
+  depend on the local input; inverse/composition and witness transport are explicit.
 - Hidden mixture compiles the weighted score coefficients, using the posterior
   average reward at each input. It does not reveal a component tag. Its optimum is
   at most the weighted sum of component optima, generally not equal.

@@ -68,10 +68,13 @@ def task_to_dict(task):
             "resource": resource_to_dict(task.resource)}
 
 
-def task_from_dict(data, **resource_limits):
+def task_from_dict(data, *, max_game_entries=1_000_000, max_scalar_bits=4096,
+                   max_scalar_chars=8192, **resource_limits):
     if not isinstance(data, dict) or set(data) != {"schema", "game", "resource"} or data["schema"] != TASK_SCHEMA:
         raise ValueError("Invalid task document fields or schema")
-    return AnalysisTask(game_from_dict(data["game"]), resource_from_dict(data["resource"], **resource_limits))
+    game = game_from_dict(data["game"], max_entries=max_game_entries,
+                          max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)
+    return AnalysisTask(game, resource_from_dict(data["resource"], **resource_limits))
 
 
 def dump_task(task, path):

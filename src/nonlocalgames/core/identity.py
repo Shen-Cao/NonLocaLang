@@ -3,6 +3,8 @@ import hashlib
 import json
 from numbers import Integral
 
+from .scalar_wire import scalar_string
+
 VERIFIER_ID_PREFIX = "nonlocalgames.verifier.v1:"
 RESOURCE_ID_PREFIX = "nonlocalgames.resource.v2:"
 
@@ -61,8 +63,8 @@ def verifier_digest(game):
         raise TypeError("Expected a finite Game")
     payload = {"input_sizes": game.scenario.input_sizes,
                "output_sizes": game.scenario.output_sizes,
-               "distribution": tuple(map(str, game.distribution)),
-               "payoff": tuple(map(str, game.payoff))}
+               "distribution": tuple(map(scalar_string, game.distribution)),
+               "payoff": tuple(map(scalar_string, game.payoff))}
     return hashlib.sha256(canonical_json(payload).encode("utf-8")).hexdigest()
 
 

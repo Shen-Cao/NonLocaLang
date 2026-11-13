@@ -5,6 +5,7 @@ from itertools import islice
 from math import isqrt
 
 from ...certificates.linalg import verify_psd
+from ...core.scalar_wire import ScalarBudgetExceeded
 from .budgets import ExactBudgetExceeded, coerce_budget
 from .scalars import exact_scalar, scalar_bits
 
@@ -110,7 +111,9 @@ def verify_psd_complex(matrix, *, budget=None):
         raise ValueError('Matrix is not exactly Hermitian')
     converted = realification(matrix, budget=budget)
     try:
-        return verify_psd(converted, max_size=budget.max_psd_size)
+        return verify_psd(converted, max_size=budget.max_psd_size, max_scalar_bits=budget.max_scalar_bits)
+    except ScalarBudgetExceeded as error:
+        raise ExactBudgetExceeded('Complex PSD scalar verification exceeds the exact budget') from error
     except ValueError as error:
         if 'not PSD' in str(error):
             raise ExactPSDViolation(str(error)) from error

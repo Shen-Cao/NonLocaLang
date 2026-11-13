@@ -9,7 +9,7 @@ from math import prod
 from scipy.sparse import coo_matrix
 
 from ..behavior import RationalBehavior, positive_budget
-from ..behavior_serialization import behavior_to_dict
+from ..behavior_serialization import behavior_to_dict, validate_behavior_scalars
 from ..compatibility import validate_triangle
 from ..serialization import network_to_dict
 
@@ -39,7 +39,7 @@ def fingerprint(data):
 
 
 def compile_spiral(network, behavior, *, max_variables=100_000, max_equalities=100_000,
-                   max_nonzeros=500_000):
+                   max_nonzeros=500_000, max_scalar_bits=4096, max_scalar_chars=8192):
     """Compile Aq=b(p), q>=0 with five maximal expressible marginal blocks.
 
     The rows are pABC, pAC*pB, pAB*pC, pBC*pA, and pA*pB*pC, each in
@@ -61,6 +61,8 @@ def compile_spiral(network, behavior, *, max_variables=100_000, max_equalities=1
     for size, limit, name in zip(counts, budgets, ("max_variables", "max_equalities", "max_nonzeros")):
         if size > limit:
             raise ValueError(f"Spiral inflation exceeds {name}: needs {size}, limit {limit}")
+    validate_behavior_scalars(behavior, max_entries=joint, max_scalar_bits=max_scalar_bits,
+                              max_scalar_chars=max_scalar_chars)
     profiles = tuple(product(*(range(n) for n in sizes)))
     marginals = [behavior.marginal((i,), (0, 0, 0)) for i in range(3)]
     ac = behavior.marginal((0, 2), (0, 0, 0))

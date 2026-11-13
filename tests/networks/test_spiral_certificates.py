@@ -124,3 +124,27 @@ def test_finite_overflowing_solver_vector_remains_json_safe(monkeypatch):
     assert result.status == 'unknown'
     assert result.diagnostics['numerical_primal_max_residual'] is None
     json.dumps(result.diagnostics, default=str, allow_nan=False)
+
+
+@pytest.mark.parametrize('text', ['1e1000000000', '1/0', '1/8'])
+def test_creation_and_encoding_never_parse_unbounded_text(text):
+    graph, behavior, certificate = _analytic_w()
+    program = compile_spiral(graph, behavior)
+    with pytest.raises(TypeError, match='already-exact'):
+        make_certificate(program, 'dual', (text,)*40)
+    with pytest.raises(TypeError, match='already-exact'):
+        spiral_certificate_to_dict(replace(certificate, coefficients=(text,)*40))
+    with pytest.raises(ValueError, match='vector length'):
+        make_certificate(program, 'dual', repeat(text))
+
+
+def test_encoding_does_not_add_hidden_default_bit_limit_to_verified_coefficients():
+    graph, behavior, certificate = _analytic_w()
+    factor = 2**5000
+    candidate = make_certificate(compile_spiral(graph, behavior), 'dual',
+                                 tuple(factor*v for v in certificate.coefficients))
+    checked = verify_spiral_certificate(graph, behavior, candidate, max_scalar_bits=6000)
+    assert checked.diagnostics['farkas_margin'] == -Fraction(factor, 27)
+    payload = spiral_certificate_to_dict(checked.certificate)
+    assert spiral_certificate_from_dict(payload, max_scalar_bits=6000) == checked.certificate
+    assert verify_spiral_certificate(graph, behavior, payload, max_scalar_bits=6000).status == 'incompatible'

@@ -2,6 +2,7 @@
 from math import prod
 
 from ..core.numeric_data import matrix_from_dict, positive_budget
+from ..core.scalar_wire import parse_rational, scalar_string
 from ..quantum.states import validate_dimensions
 
 from ..core.game import Scenario
@@ -39,21 +40,46 @@ def classical_to_dict(strategy):
             "network": network_to_dict(strategy.network),
             "scenario": {"input_sizes": list(strategy.scenario.input_sizes),
                          "output_sizes": list(strategy.scenario.output_sizes)},
-            "source_probabilities": [list(map(str, p)) for p in strategy.source_probabilities],
-            "responses": [list(map(str, p)) for p in strategy.responses]}
+            "source_probabilities": [list(map(scalar_string, p)) for p in strategy.source_probabilities],
+            "responses": [list(map(scalar_string, p)) for p in strategy.responses]}
 
 
-def classical_from_dict(data):
+def classical_from_dict(data, *, max_entries=1_000_000, max_scalar_bits=4096,
+                        max_scalar_chars=8192):
+    """Check complete table dimensions/counts before bounded rational parsing.
+
+    max_entries bounds source-law and response-table entries together. Scalar
+    limits apply to their numerical content, not graph/schema metadata strings.
+    """
+    limit = positive_budget(max_entries, "max_entries")
     _fields(data, {"schema", "encoding", "network", "scenario", "source_probabilities", "responses"}, CLASSICAL_SCHEMA)
     if data["encoding"] != "rational":
         raise ValueError("Classical network witnesses require rational encoding")
     _fields(data["scenario"], {"input_sizes", "output_sizes"})
-    for key in ("source_probabilities", "responses"):
-        if not isinstance(data[key], list) or any(not isinstance(row, list) or
-                any(not isinstance(p, str) for p in row) for row in data[key]):
+    network, scenario = network_from_dict(data["network"]), Scenario(**data["scenario"])
+    if network.parties != scenario.parties:
+        raise ValueError("Network and scenario must have the same parties")
+    sources, responses = data["source_probabilities"], data["responses"]
+    if (not isinstance(sources, list) or len(sources) != len(network.sources)
+            or any(not isinstance(row, list) or not row for row in sources)):
+        raise ValueError("Provide one nonempty source probability list per source")
+    if (not isinstance(responses, list) or len(responses) != network.parties
+            or any(not isinstance(row, list) for row in responses)):
+        raise ValueError("Provide one response table per party")
+    if sum(len(row) for row in sources) + sum(len(row) for row in responses) > limit:
+        raise ValueError("Classical network tables exceed max_entries")
+    for i, row in enumerate(responses):
+        expected = scenario.input_sizes[i]*scenario.output_sizes[i]*prod(
+            len(sources[s]) for s in network.incident_sources(i))
+        if len(row) != expected:
+            raise ValueError("Local response table does not match input/source/output sizes")
+    for collection in (sources, responses):
+        if any(not isinstance(p, str) for row in collection for p in row):
             raise ValueError("Rational tables must be lists of lists of strings")
-    return ClassicalNetworkStrategy(network_from_dict(data["network"]), Scenario(**data["scenario"]),
-                                    data["source_probabilities"], data["responses"])
+    def parse_rows(collection):
+        return tuple(tuple(parse_rational(p, max_bits=max_scalar_bits, max_chars=max_scalar_chars)
+                           for p in row) for row in collection)
+    return ClassicalNetworkStrategy(network, scenario, parse_rows(sources), parse_rows(responses))
 
 
 def _matrix_to_dict(matrix):

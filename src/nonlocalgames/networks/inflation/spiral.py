@@ -6,6 +6,7 @@ from numbers import Integral, Real
 
 import numpy as np
 
+from ...core.scalar_wire import ScalarBudgetExceeded
 from ..behavior import positive_budget
 from ._program import compile_spiral
 from .certificates import (_dual_quantities, make_certificate, verify_spiral_certificate)
@@ -64,7 +65,8 @@ def _solver_options(options):
 
 def triangle_spiral(network, behavior, *, max_denominator=1_000_000, solver_options=None,
                     validation_tolerance=1e-7,
-                    max_variables=100_000, max_equalities=100_000, max_nonzeros=500_000):
+                    max_variables=100_000, max_equalities=100_000, max_nonzeros=500_000,
+                    max_scalar_bits=4096, max_scalar_chars=8192):
     """Test one classical fanout inflation, with exactly verified rational evidence.
 
     A positive primal certificate proves only feasibility of this relaxation.
@@ -78,7 +80,8 @@ def triangle_spiral(network, behavior, *, max_denominator=1_000_000, solver_opti
     denominator = positive_budget(max_denominator, "max_denominator")
     options = _solver_options(solver_options)
     tolerance = _positive_real(validation_tolerance, "validation_tolerance")
-    budgets = dict(max_variables=max_variables, max_equalities=max_equalities, max_nonzeros=max_nonzeros)
+    budgets = dict(max_variables=max_variables, max_equalities=max_equalities, max_nonzeros=max_nonzeros,
+                   max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)
     program = compile_spiral(network, behavior, **budgets)
     matrix = program.matrix
     rhs = np.asarray(program.rhs, dtype=float)
@@ -96,6 +99,8 @@ def triangle_spiral(network, behavior, *, max_denominator=1_000_000, solver_opti
             checked = verify_spiral_certificate(network, behavior,
                 make_certificate(program, "primal", primal_candidate), **budgets)
             return replace(checked, diagnostics={**diagnostics, **checked.diagnostics})
+        except ScalarBudgetExceeded:
+            raise
         except ValueError as error:
             diagnostics["primal_reconstruction_error"] = str(error)
         diagnostics["numerical_primal_minimum"] = float(np.min(primal_values))
@@ -122,6 +127,8 @@ def triangle_spiral(network, behavior, *, max_denominator=1_000_000, solver_opti
             checked = verify_spiral_certificate(network, behavior,
                 make_certificate(program, "dual", repaired), **budgets)
             return replace(checked, diagnostics={**diagnostics, **checked.diagnostics})
+        except ScalarBudgetExceeded:
+            raise
         except ValueError as error:
             diagnostics["dual_reconstruction_error"] = str(error)
     if (getattr(primal, "status", None) == 0 and primal_candidate is not None

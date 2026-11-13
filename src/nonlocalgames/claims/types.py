@@ -69,6 +69,7 @@ class VerificationBudget:
     max_matrix_size: int = 128
     max_artifact_bytes: int = 8_000_000
     max_artifacts: int = 100
+    max_property_entries: int = 1_000_000
     max_quantum_joint_dimension: int = 16
     max_quantum_entries: int = 100_000
     max_quantum_events: int = 100_000
@@ -108,6 +109,28 @@ class EvidenceCheck:
     upper: Fraction | None
     checker: str
     is_proof: bool = True
+    attained_score: Fraction | None = None
+    actual_dimensions: tuple[int, ...] | None = None
+
+    def __post_init__(self):
+        object.__setattr__(self, 'resource', Resource(self.resource))
+        if not isinstance(self.is_proof, bool):
+            raise TypeError('is_proof must be a Boolean')
+        for name in ('lower', 'upper', 'attained_score'):
+            value = getattr(self, name)
+            if value is not None:
+                if isinstance(value, bool) or not isinstance(value, (Fraction, Integral)):
+                    raise TypeError('Checked bounds and attainment scores must be exact rationals')
+                object.__setattr__(self, name, rational(value))
+        if not self.is_proof and any(v is not None for v in
+                                    (self.lower, self.upper, self.attained_score, self.actual_dimensions)):
+            raise ValueError('Untrusted hints cannot carry checked bound or attainment facts')
+        if self.actual_dimensions is not None:
+            dimensions = tuple(self.actual_dimensions)
+            if self.attained_score is None or not dimensions or any(
+                    isinstance(d, bool) or not isinstance(d, Integral) or d < 1 for d in dimensions):
+                raise ValueError('Witness dimensions require an attained score and positive integers')
+            object.__setattr__(self, 'actual_dimensions', tuple(int(d) for d in dimensions))
 
 
 @dataclass(frozen=True)
@@ -122,7 +145,7 @@ class ClaimAssessment:
     derivation: tuple[str, ...] = ()
     issues: tuple[ClaimIssue, ...] = ()
     checks: tuple[EvidenceCheck, ...] = ()
-    schema: str = field(default='nonlocalgames.claim_assessment.v1', init=False)
+    schema: str = field(default='nonlocalgames.claim_assessment.v2', init=False)
 
     def __post_init__(self):
         object.__setattr__(self, 'truth', TruthStatus(self.truth))

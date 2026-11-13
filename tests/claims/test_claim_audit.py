@@ -169,10 +169,10 @@ def test_evidence_binding_preserves_sampler_and_ignores_display_name_only():
 
 def test_conflicting_checked_bounds_are_quarantined_after_transport(monkeypatch):
     from nonlocalgames.claims.verify import EvidenceCheck
-    import nonlocalgames.claims.inference as inference
+    import nonlocalgames.claims.admission as admission
     checks = iter((EvidenceCheck('lower', Resource.LOCAL, Fraction(3, 4), None, 'test_checker'),
                    EvidenceCheck('upper', Resource.NONSIGNALLING, None, Fraction(1, 2), 'test_checker')))
-    monkeypatch.setattr(inference, 'verify_artifact', lambda *args, **kwargs: next(checks))
+    monkeypatch.setattr(admission, 'verify_artifact', lambda *args, **kwargs: next(checks))
     result = assess_value(chsh(), ValueClaim(LOCAL, 'at_least', '1/4'), [object(), object()])
     assert result.truth == TruthStatus.UNKNOWN and result.execution == ExecutionStatus.CONFLICT
     assert any(i.lower is not None and i.upper is not None and i.lower > i.upper for i in result.intervals)

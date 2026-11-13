@@ -69,12 +69,12 @@ def verify_artifact(game, artifact, *, budget=None):
             witness = DeterministicStrategy(game.scenario, payload['strategy'])
             lower = witness.score(game)
             if artifact.kind == EvidenceKind.LOCAL_STRATEGY:
-                return EvidenceCheck(identifier, resource.kind, lower, None, 'deterministic_score.v1')
+                return EvidenceCheck(identifier, resource.kind, lower, None, 'deterministic_score.v1', attained_score=lower)
             from ..analysis.classical import classical_value
             exact = classical_value(game, max_strategies=budget.max_strategies)
             if lower != exact.value or rational(payload['value']) != exact.value:
                 raise ValueError('Local enumeration payload does not match independent exact replay')
-            return EvidenceCheck(identifier, resource.kind, exact.value, exact.value, 'local_enumeration_replay.v1')
+            return EvidenceCheck(identifier, resource.kind, exact.value, exact.value, 'local_enumeration_replay.v1', attained_score=lower)
         if artifact.kind == EvidenceKind.NONSIGNALLING_LP:
             if resource.kind != Resource.NONSIGNALLING:
                 raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'NS certificates must declare the standard nonsignalling source model', identifier)
@@ -84,7 +84,8 @@ def verify_artifact(game, artifact, *, budget=None):
             from ..analysis.certificates import verify_nonsignalling_certificate
             result = verify_nonsignalling_certificate(game, payload['primal'], payload['dual'], max_variables=budget.max_variables)
             return EvidenceCheck(identifier, resource.kind, result.diagnostics['lower_bound'],
-                                  result.diagnostics['upper_bound'], 'rational_ns_lp.v1')
+                                  result.diagnostics['upper_bound'], 'rational_ns_lp.v1',
+                                  attained_score=result.diagnostics['lower_bound'])
         if artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
             if resource.kind != Resource.QUANTUM_FINITE:
                 raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'Quantum strategy certificates use the standard finite tensor-product source model', identifier)
@@ -95,7 +96,8 @@ def verify_artifact(game, artifact, *, budget=None):
                                                           max_bytes=budget.max_artifact_bytes)
             except ExactBudgetExceeded as error:
                 raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
-            return EvidenceCheck(identifier, resource.kind, result.value, None, 'rational_quantum_strategy.v1')
+            return EvidenceCheck(identifier, resource.kind, result.value, None, 'rational_quantum_strategy.v1',
+                                 attained_score=result.value, actual_dimensions=tuple(result.diagnostics['actual_local_dimensions']))
         if artifact.kind == EvidenceKind.XOR_DUAL:
             if resource.kind != Resource.QUANTUM_COMMUTING:
                 raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'XOR duals use the standard commuting upper-bound source model', identifier)
@@ -111,5 +113,5 @@ def verify_artifact(game, artifact, *, budget=None):
         raise EvidenceError(ExecutionStatus.DEPENDENCY_UNAVAILABLE, str(error), identifier) from error
     except RuntimeError as error:
         raise EvidenceError(ExecutionStatus.CHECKER_ERROR, str(error), identifier) from error
-    except (TypeError, ValueError, KeyError, OverflowError) as error:
+    except (TypeError, ValueError, KeyError, OverflowError, ZeroDivisionError) as error:
         raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, str(error), identifier) from error

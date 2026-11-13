@@ -127,3 +127,11 @@ The quantum checker has explicit dimension, realification, matrix-entry, event,
 party, and scalar-bit budgets. It can prove a strict quantum gap from a feasible
 point and an independent classical upper bound; it does not claim global
 optimality or self-testing.
+
+
+`verify_evidence_bundle` is the shared raw-artifact admission path for value and
+property claims. It records attained scores separately from bounds and retains
+witness dimensions where known. A returned bundle is a receipt, not an input proof
+token. Claim-assessment receipts use schema v2 for these additional checked facts;
+claim-definition and evidence-envelope schemas remain unchanged. See
+[properties](properties.md) for the narrowly supported attainment predicates.

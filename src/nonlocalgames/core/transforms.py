@@ -24,31 +24,19 @@ def mix(games, weights, *, name="Hidden mixture"):
     return Game.from_rule(s, score, distribution=mu, name=name)
 
 
-def relabel(game, input_permutations, output_permutations):
-    """Maps new labels to old labels locally; output maps may depend on new input.
+def relabel(game, input_permutations, output_permutations, *, max_entries=1_000_000,
+            max_map_entries=1_000_000):
+    """Relabel local interfaces through a checked new-to-old bijection descriptor.
 
-    input_permutations[i][x_new] = x_old;
-    output_permutations[i][x_new][a_new] = a_old.
+    This convenience wrapper appends " (relabelled)" to the display name.
+    Use equivalence.Relabelling and relabel_game for party permutations,
+    inverse/composition, resource transport, or an unchanged display name.
     """
-    s = game.scenario
-    ip = tuple(tuple(p) for p in input_permutations)
-    op = tuple(tuple(tuple(p) for p in party) for party in output_permutations)
-    if len(ip) != s.parties or len(op) != s.parties:
-        raise ValueError("Provide permutations for each party")
-    for i, (nx, na) in enumerate(zip(s.input_sizes, s.output_sizes)):
-        if sorted(ip[i]) != list(range(nx)) or len(op[i]) != nx:
-            raise ValueError("Invalid input permutation or output map shape")
-        if any(sorted(p) != list(range(na)) for p in op[i]):
-            raise ValueError("Invalid output permutation")
-
-    def old_x(x):
-        return tuple(ip[i][x[i]] for i in range(s.parties))
-
-    def old_a(x, a):
-        return tuple(op[i][x[i]][a[i]] for i in range(s.parties))
-    return Game.from_rule(s, lambda x, a: game.reward(old_x(x), old_a(x, a)),
-                          distribution={x: game.probability(old_x(x)) for x in s.inputs},
-                          name=game.name + " (relabelled)")
+    from ..equivalence.maps import Relabelling
+    from ..equivalence.finite import relabel_game
+    mapping = Relabelling(game.scenario, input_maps=input_permutations,
+                           output_maps=output_permutations, max_map_entries=max_map_entries)
+    return relabel_game(game, mapping, max_entries=max_entries, name=game.name + " (relabelled)")
 
 
 def parallel_product(left, right, *, max_entries=1_000_000):

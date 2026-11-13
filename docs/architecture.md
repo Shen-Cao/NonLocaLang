@@ -23,6 +23,8 @@ materialize tuples; callers should inspect `entries` before requesting huge prof
 Versioned JSON preserves fractions as strings. Separate verifier, resource/task,
 strategy, behavior, and certificate schemas retain their respective assumptions;
 numerical quantum arrays carry explicit encodings and tolerances.
+Rational readers apply [bounded scalar decoding](scalar-wire.md) before expanding
+numeric strings; trusted Python construction remains an explicit separate path.
 
 The coefficient lowering C[x,a] = mu[x] V[x,a] preserves every linear score. Keeping
 mu and V as well retains experimental sampling, event semantics, and promise data.

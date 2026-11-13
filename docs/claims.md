@@ -110,7 +110,9 @@ labels and records unknown quantum gaps rather than promoting them to theorems.
 ## Budgets and trust boundary
 
 `VerificationBudget` limits artifact count, full-envelope bytes, local strategies,
-NS variables, and exact PSD matrix size. These are count/size limits per artifact,
+NS variables, exact PSD matrix size, and supplied scalar bits/text lengths. See
+[exact scalar data boundaries](scalar-wire.md) for grammar and explicit overrides.
+These are count/size limits per artifact,
 not a global wall-clock guarantee; rational coefficient bit complexity matters.
 The caller chooses budgets, and payloads cannot override them. Exhaustion is not
 a negative mathematical result. Wider execution isolation belongs to the later

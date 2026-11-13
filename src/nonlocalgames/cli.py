@@ -11,6 +11,7 @@ import sys
 from .analysis import (certify_nonsignalling, classical_value, nonsignalling_value,
                        npa_bound, xor_quantum_value, certify_xor_upper_bound)
 from .core.serialization import load
+from .core.scalar_wire import scalar_string
 from .games import GAMES
 
 
@@ -26,7 +27,7 @@ def environment():
 
 def json_default(value):
     if isinstance(value, Fraction):
-        return str(value)
+        return scalar_string(value)
     if hasattr(value, "tolist"):
         return value.tolist()
     raise TypeError(f"Cannot serialize {type(value).__name__}")

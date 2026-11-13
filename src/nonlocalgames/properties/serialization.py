@@ -3,6 +3,7 @@ from dataclasses import asdict
 from fractions import Fraction
 
 from ..core.identity import canonical_json, verifier_id
+from ..core.scalar_wire import scalar_string
 from ..core.resource_serialization import resource_from_dict, resource_to_dict
 from .identity import property_id
 from .types import PropertyAssessment, PropertyClaim
@@ -34,7 +35,7 @@ def property_claim_from_dict(game, data, *, max_bytes=8_000_000):
 
 def _json_value(value):
     if isinstance(value, Fraction):
-        return str(value)
+        return scalar_string(value)
     if isinstance(value, dict):
         return {key: _json_value(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):

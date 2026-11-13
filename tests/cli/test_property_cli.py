@@ -50,3 +50,18 @@ def test_property_cli_rejects_receipts_and_wrong_context(tmp_path, capsys):
     with pytest.raises(SystemExit):
         main(['property', 'ghz', '--kind', 'pseudotelepathy', '--evidence', str(path)])
     assert 'list of raw artifact' in capsys.readouterr().err
+
+
+def test_property_cli_bounds_game_scalars_and_accepts_explicit_override(tmp_path, capsys):
+    from nonlocalgames import Game, Scenario
+    from nonlocalgames.core.serialization import to_dict
+    game = Game(Scenario((1,), (1,)), (1,), (10**1300,))
+    path = tmp_path / 'game.json'
+    path.write_text(json.dumps(to_dict(game)))
+    args = ['property', 'json', '--file', str(path), '--kind', 'acceptance']
+    with pytest.raises(SystemExit):
+        main(args)
+    assert 'max_bits' in capsys.readouterr().err
+    main([*args, '--max-scalar-bits', '4400'])
+    result = json.loads(capsys.readouterr().out)['assessment']
+    assert result['execution'] == 'completed' and result['truth'] == 'disproved'

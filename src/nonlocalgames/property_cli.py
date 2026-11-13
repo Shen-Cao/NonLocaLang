@@ -35,6 +35,10 @@ def main(argv=None):
     parser.add_argument('--evidence', help='JSON list of raw evidence envelopes; no result receipts')
     parser.add_argument('--max-property-entries', type=int, default=1_000_000)
     parser.add_argument('--max-artifacts', type=int, default=100)
+    parser.add_argument('--max-scalar-bits', type=int, default=4096,
+                        help='game and nonquantum certificate rational-component limit')
+    parser.add_argument('--max-scalar-chars', type=int, default=8192,
+                        help='game and nonquantum certificate scalar-text limit')
     parser.add_argument('--max-file-bytes', type=int, default=64_000_000)
     args = parser.parse_args(argv)
     if (args.game == 'json') != (args.file is not None):
@@ -46,8 +50,14 @@ def main(argv=None):
     try:
         positive_budget(args.max_file_bytes, 'max_file_bytes')
         budget = VerificationBudget(max_property_entries=args.max_property_entries,
-                                     max_artifacts=args.max_artifacts)
-        game = game_from_dict(_load(args.file, args.max_file_bytes)) if args.game == 'json' else GAMES[args.game]()
+                                     max_artifacts=args.max_artifacts,
+                                     max_wire_scalar_bits=args.max_scalar_bits,
+                                     max_wire_scalar_chars=args.max_scalar_chars)
+        game = (game_from_dict(_load(args.file, args.max_file_bytes),
+                              max_entries=args.max_property_entries,
+                              max_scalar_bits=args.max_scalar_bits,
+                              max_scalar_chars=args.max_scalar_chars)
+                if args.game == 'json' else GAMES[args.game]())
         resource = None
         if args.resource is not None:
             resource = ResourceSpec(args.resource)

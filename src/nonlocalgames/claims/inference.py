@@ -2,6 +2,7 @@
 from hashlib import sha256
 
 from ..core.identity import canonical_json, resource_id, verifier_id
+from ..core.scalar_wire import scalar_string
 from .resources import includes, is_standard
 from .admission import verify_evidence_bundle
 from .types import (ClaimAssessment, ClaimIssue,
@@ -12,7 +13,7 @@ from .types import (ClaimAssessment, ClaimIssue,
 def claim_id(game, claim):
     if not isinstance(claim, (ValueClaim, GapClaim)):
         raise TypeError('Expected ValueClaim or GapClaim')
-    payload = {'game_id': verifier_id(game), 'threshold': str(claim.threshold)}
+    payload = {'game_id': verifier_id(game), 'threshold': scalar_string(claim.threshold)}
     if isinstance(claim, ValueClaim):
         payload.update(kind='value', resource=resource_id(claim.resource), relation=claim.relation.value)
     elif isinstance(claim, GapClaim):

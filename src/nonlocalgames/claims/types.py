@@ -75,6 +75,8 @@ class VerificationBudget:
     max_quantum_events: int = 100_000
     max_quantum_parties: int = 32
     max_quantum_scalar_bits: int = 4096
+    max_wire_scalar_bits: int = 4096
+    max_wire_scalar_chars: int = 8192
 
     def __post_init__(self):
         for name in self.__dataclass_fields__:

@@ -2,7 +2,8 @@
 import json
 from math import prod
 
-from ..core.game import rational
+from ..core.scalar_wire import ScalarBudgetExceeded, parse_rational
+from ..core.wire_validation import validate_game_numbers
 from ..core.identity import canonical_json, verifier_id
 from ..core.resources import Resource, ResourceSpec
 from .artifacts import EvidenceArtifact, EvidenceKind
@@ -44,6 +45,12 @@ def verify_artifact(game, artifact, *, budget=None):
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Evidence exceeds max_artifact_bytes')
     identifier = artifact.artifact_id
     quantum_policy = _quantum_policy(game, budget, identifier) if artifact.kind == EvidenceKind.QUANTUM_STRATEGY else None
+    if quantum_policy is None:
+        try:
+            validate_game_numbers(game, max_scalar_bits=budget.max_wire_scalar_bits,
+                                  max_scalar_chars=budget.max_wire_scalar_chars)
+        except ScalarBudgetExceeded as error:
+            raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
     if artifact.game_id != verifier_id(game):
         raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, 'Evidence belongs to a different verifier', identifier)
     try:
@@ -66,13 +73,16 @@ def verify_artifact(game, artifact, *, budget=None):
                     raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Classical replay exceeds max_strategies', identifier)
             from ..classical import DeterministicStrategy
             _fields(payload, {'strategy'} if artifact.kind == EvidenceKind.LOCAL_STRATEGY else {'strategy', 'value'})
+            claimed_value = (parse_rational(payload['value'], max_bits=budget.max_wire_scalar_bits,
+                                            max_chars=budget.max_wire_scalar_chars)
+                             if artifact.kind == EvidenceKind.LOCAL_ENUMERATION else None)
             witness = DeterministicStrategy(game.scenario, payload['strategy'])
             lower = witness.score(game)
             if artifact.kind == EvidenceKind.LOCAL_STRATEGY:
                 return EvidenceCheck(identifier, resource.kind, lower, None, 'deterministic_score.v1', attained_score=lower)
             from ..analysis.classical import classical_value
             exact = classical_value(game, max_strategies=budget.max_strategies)
-            if lower != exact.value or rational(payload['value']) != exact.value:
+            if lower != exact.value or claimed_value != exact.value:
                 raise ValueError('Local enumeration payload does not match independent exact replay')
             return EvidenceCheck(identifier, resource.kind, exact.value, exact.value, 'local_enumeration_replay.v1', attained_score=lower)
         if artifact.kind == EvidenceKind.NONSIGNALLING_LP:
@@ -82,7 +92,10 @@ def verify_artifact(game, artifact, *, budget=None):
             if game.scenario.entries > budget.max_variables:
                 raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'NS verification exceeds max_variables', identifier)
             from ..analysis.certificates import verify_nonsignalling_certificate
-            result = verify_nonsignalling_certificate(game, payload['primal'], payload['dual'], max_variables=budget.max_variables)
+            result = verify_nonsignalling_certificate(
+                game, payload['primal'], payload['dual'], max_variables=budget.max_variables,
+                max_scalar_bits=budget.max_wire_scalar_bits,
+                max_scalar_chars=budget.max_wire_scalar_chars)
             return EvidenceCheck(identifier, resource.kind, result.diagnostics['lower_bound'],
                                   result.diagnostics['upper_bound'], 'rational_ns_lp.v1',
                                   attained_score=result.diagnostics['lower_bound'])
@@ -104,11 +117,16 @@ def verify_artifact(game, artifact, *, budget=None):
             if sum(game.scenario.input_sizes) > budget.max_matrix_size:
                 raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'XOR verification exceeds max_matrix_size', identifier)
             from ..certificates.xor import verify_xor_certificate
-            result = verify_xor_certificate(game, payload, max_matrix_size=budget.max_matrix_size)
+            result = verify_xor_certificate(
+                game, payload, max_matrix_size=budget.max_matrix_size,
+                max_scalar_bits=budget.max_wire_scalar_bits,
+                max_scalar_chars=budget.max_wire_scalar_chars)
             return EvidenceCheck(identifier, resource.kind, None, result.value, 'rational_xor_dual.v1')
         raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'No verifier is registered for this evidence kind', identifier)
     except EvidenceError:
         raise
+    except ScalarBudgetExceeded as error:
+        raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
     except ImportError as error:
         raise EvidenceError(ExecutionStatus.DEPENDENCY_UNAVAILABLE, str(error), identifier) from error
     except RuntimeError as error:

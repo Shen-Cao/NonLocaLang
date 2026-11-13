@@ -5,7 +5,8 @@ from fractions import Fraction
 from itertools import islice
 from math import prod
 
-from ..core.game import rational
+from ..core.scalar_wire import parse_rational
+from ..core.wire_validation import validate_game_numbers
 from .nonsignalling import _nonsignalling_program, _solve_nonsignalling
 from .result import AnalysisResult
 
@@ -40,7 +41,8 @@ def _verify_rational_lp(matrix, rhs, coefficients, primal, dual):
 
 
 def certify_nonsignalling(game, *, max_denominator: int = 1_000_000,
-                         max_variables: int = 100_000) -> AnalysisResult:
+                         max_variables: int = 100_000, max_scalar_bits=4096,
+                         max_scalar_chars=8192) -> AnalysisResult:
     """Solve numerically, reconstruct rational witnesses, then verify them exactly.
 
     Reconstruction can fail even when the numerical optimum is accurate. A
@@ -52,11 +54,14 @@ def certify_nonsignalling(game, *, max_denominator: int = 1_000_000,
     if (isinstance(max_denominator, bool) or not isinstance(max_denominator, int)
             or max_denominator < 1):
         raise ValueError("max_denominator must be a positive integer")
+    validate_game_numbers(game, max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)
     numerical, _, _, numeric_dual = _solve_nonsignalling(game, max_variables)
     primal = tuple(Fraction(float(v)).limit_denominator(max_denominator)
                    for v in numerical.witness.ravel())
     dual = tuple(Fraction(float(v)).limit_denominator(max_denominator) for v in numeric_dual)
-    verified = verify_nonsignalling_certificate(game, primal, dual, max_variables=max_variables)
+    verified = verify_nonsignalling_certificate(
+        game, primal, dual, max_variables=max_variables,
+        max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)
     return replace(verified, method="rational_lp_certificate", diagnostics={
         **verified.diagnostics, "max_denominator": max_denominator,
         "numerical_solver": numerical.diagnostics["solver"],
@@ -84,7 +89,8 @@ def _bounded_entries(values, expected, name):
     return entries
 
 
-def verify_nonsignalling_certificate(game, primal, dual, *, max_variables: int = 100_000):
+def verify_nonsignalling_certificate(game, primal, dual, *, max_variables: int = 100_000,
+                                     max_scalar_bits=4096, max_scalar_chars=8192):
     """Recheck an exported rational LP witness without solving an optimization.
 
     Accept exact integers, Fractions, or rational strings; floating-point data
@@ -95,11 +101,15 @@ def verify_nonsignalling_certificate(game, primal, dual, *, max_variables: int =
     equal endpoints establish the exact optimum. Invalid witnesses raise.
     Size budgets and both vector lengths are checked before rational conversion
     or sparse-program allocation; at most the expected length plus one is read.
+    Scalar limits bound supplied values, not all derived exact arithmetic.
     """
     variables, equalities = _certificate_dimensions(game, max_variables)
     primal_entries = _bounded_entries(primal, variables, "primal")
     dual_entries = _bounded_entries(dual, equalities, "dual")
-    primal, dual = tuple(map(rational, primal_entries)), tuple(map(rational, dual_entries))
+    validate_game_numbers(game, max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)
+    limits = dict(max_bits=max_scalar_bits, max_chars=max_scalar_chars)
+    primal = tuple(parse_rational(v, **limits) for v in primal_entries)
+    dual = tuple(parse_rational(v, **limits) for v in dual_entries)
     matrix, rhs = _nonsignalling_program(game, max_variables)
     if matrix.shape != (equalities, variables) or len(rhs) != equalities:
         raise RuntimeError("Nonsignalling certificate row schema differs from its preflight dimensions")

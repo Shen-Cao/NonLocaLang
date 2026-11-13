@@ -92,7 +92,7 @@ def test_checker_bounds_infinite_vectors_before_conversion_and_allocation(monkey
     def forbidden(*args, **kwargs):
         pytest.fail('invalid vector lengths must fail before conversion or sparse allocation')
 
-    monkeypatch.setattr(certificates, 'rational', forbidden)
+    monkeypatch.setattr(certificates, 'parse_rational', forbidden)
     monkeypatch.setattr(certificates, '_nonsignalling_program', forbidden)
     primal = repeat(object()) if oversized == 'primal' else [object()]*16
     dual = repeat(object()) if oversized == 'dual' else [object()]*12
@@ -110,7 +110,7 @@ def test_checker_consumes_at_most_expected_length_plus_one(monkeypatch):
             yield object()
         pytest.fail('checker consumed beyond the bounded dimension probe')
 
-    monkeypatch.setattr(certificates, 'rational', lambda value: pytest.fail('must reject size first'))
+    monkeypatch.setattr(certificates, 'parse_rational', lambda value: pytest.fail('must reject size first'))
     with pytest.raises(ValueError, match='primal dimensions'):
         verify_nonsignalling_certificate(chsh(), too_long(), [0]*12)
     assert consumed == list(range(17))

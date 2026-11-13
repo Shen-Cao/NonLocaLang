@@ -37,3 +37,32 @@ def test_nonbinary_no_input_and_signed_payoff():
     assert nonsignalling_value(game).value == pytest.approx(-0.5)
     with pytest.raises(ValueError, match="limit"):
         nonsignalling_value(chsh(), max_variables=1)
+
+
+def test_singleton_input_parties_skip_empty_complement_enumeration(monkeypatch):
+    import nonlocalgames.analysis.nonsignalling as nonsignalling
+    game = Game(Scenario((1,)*64, (1,)*64), (1,), (1,))
+
+    def forbidden(*args, **kwargs):
+        pytest.fail('A singleton input cannot contribute a nonsignalling comparison row')
+
+    monkeypatch.setattr(nonsignalling, 'product', forbidden)
+    matrix, rhs = nonsignalling._nonsignalling_program(game, max_variables=1)
+    assert matrix.shape == (1, 1) and matrix.nnz == 1
+    assert matrix[0, 0] == 1 and rhs == (1,)
+
+
+def test_mixed_input_sizes_keep_joint_complement_constraints_and_row_schema():
+    from nonlocalgames.analysis.nonsignalling import _nonsignalling_program
+    scenario = Scenario((1, 2, 1, 2), (2, 2, 2, 2))
+    game = Game.from_rule(scenario, lambda x, a: 0)
+    matrix, rhs = _nonsignalling_program(game, max_variables=64)
+    assert matrix.shape == (36, 64)
+    assert rhs == (1,)*4 + (0,)*32
+    # Each singleton marginal is independent of remote questions, but the joint
+    # marginal of the two inputless parties encodes party 1's question.
+    signaling = np.array([.5 if a[1] == a[3] == 0 and (a[0] ^ a[2]) == x[1] else 0
+                          for x in scenario.inputs for a in scenario.outputs])
+    assert np.any(matrix @ signaling != np.asarray(rhs))
+    independent = np.full(64, 1/16)
+    np.testing.assert_array_equal(matrix @ independent, rhs)

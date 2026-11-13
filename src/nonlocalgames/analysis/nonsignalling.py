@@ -36,6 +36,8 @@ def _nonsignalling_program(game, max_variables):
     for x in inputs:
         add_row(((x, a, 1) for a in outputs), 1)
     for party in range(len(s.input_sizes)):
+        if s.input_sizes[party] == 1:
+            continue
         other_parties = tuple(i for i in range(len(s.input_sizes)) if i != party)
         for other_x in product(*(range(s.input_sizes[i]) for i in other_parties)):
             for other_a in product(*(range(s.output_sizes[i]) for i in other_parties)):

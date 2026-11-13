@@ -20,6 +20,7 @@ nonlocalgames = "nonlocalgames.cli:main"
 where = ["src"]
 
 [tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
 testpaths = ["tests"]
 pythonpath = ["src"]
 

@@ -91,6 +91,10 @@ def verify_artifact(game, artifact, *, budget=None):
             _fields(payload, {'primal', 'dual'})
             if game.scenario.entries > budget.max_variables:
                 raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'NS verification exceeds max_variables', identifier)
+            for field in ('primal', 'dual'):
+                vector = payload[field]
+                if not isinstance(vector, list) or any(not isinstance(entry, str) for entry in vector):
+                    raise ValueError(f'NS certificate {field} must be a JSON array of rational strings')
             from ..analysis.certificates import verify_nonsignalling_certificate
             result = verify_nonsignalling_certificate(
                 game, payload['primal'], payload['dual'], max_variables=budget.max_variables,

@@ -5,26 +5,10 @@ from ..analysis import classical_value, certify_quantum_strategy, verify_xor_dua
 from ..claims import make_evidence
 from ..core.resources import ResourceSpec
 from ..core.scalar_wire import scalar_string
-from ..quantum.exact import ExactQuantumStrategy, RationalMatrix
+from ..quantum.exact import RationalMatrix
 from ..quantum.exact.algebra import add, identity, kron, scale, subtract
+from ._bell import bell_strategy, planar_bell_strategy
 from .xor3 import xor3_game
-
-
-def _bell_strategy(alice, bob):
-    """Measure the normalized sum of |j,j> with the supplied ±1 observables."""
-    dimension = alice[0].dimension
-    size = dimension**2
-    occupied = range(0, size, dimension + 1)
-    density = RationalMatrix(tuple(tuple(Fraction(1, dimension) if i in occupied and j in occupied
-                                         else 0 for j in range(size)) for i in range(size)))
-    unit = identity(dimension)
-    half = Fraction(1, 2)
-
-    def measurements(observables):
-        return tuple((scale(add(unit, op), half), scale(subtract(unit, op), half))
-                     for op in observables)
-
-    return ExactQuantumStrategy(density, (measurements(alice), measurements(bob)))
 
 
 def _qubit_strategy(mask):
@@ -37,10 +21,7 @@ def _qubit_strategy(mask):
     else:
         alice = bob = (z, tilted, (tilted[0], -tilted[1]))
 
-    def observables(vectors):
-        return tuple(RationalMatrix(((c, s), (s, -c))) for c, s in vectors)
-
-    return _bell_strategy(observables(alice), observables(bob))
+    return planar_bell_strategy(alice, bob)
 
 
 def _optimal_strategy_10():
@@ -55,7 +36,7 @@ def _optimal_strategy_10():
              scale(subtract(first, other_three), half))
     # On the Bell state, <A ⊗ B> = tr(A Bᵀ)/d.
     bob = tuple(RationalMatrix(zip(*op.real), zip(*op.imag)) for op in alice)
-    return _bell_strategy(alice, bob)
+    return bell_strategy(alice, bob)
 
 
 def _dual_artifact(game, diagonal):

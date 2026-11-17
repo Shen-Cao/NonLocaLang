@@ -5,8 +5,8 @@ import hashlib
 import json
 from numbers import Integral
 
-from ..core.identity import (RESOURCE_ID_PREFIX, VERIFIER_ID_PREFIX, canonical_json,
-                             verifier_id)
+from ..core.identity import (JSONBudgetExceeded, RESOURCE_ID_PREFIX, VERIFIER_ID_PREFIX,
+                             canonical_json, verifier_id)
 
 EVIDENCE_SCHEMA = "nonlocalgames.evidence.v1"
 ARTIFACT_ID_PREFIX = EVIDENCE_SCHEMA + ":"
@@ -84,7 +84,7 @@ class EvidenceArtifact:
         if not isinstance(self.resource_json, str) or not isinstance(self.payload_json, str):
             raise TypeError("Evidence resource_json and payload_json must be JSON strings")
         if len(self.resource_json.encode("utf-8")) + len(self.payload_json.encode("utf-8")) > limit:
-            raise ValueError("Evidence JSON exceeds max_bytes")
+            raise JSONBudgetExceeded("Evidence JSON exceeds max_bytes")
         raw_resource, raw_payload = _load(self.resource_json), _load(self.payload_json)
         resource_json = canonical_json(raw_resource, max_bytes=limit)
         payload_json = canonical_json(raw_payload, max_bytes=limit)
@@ -142,7 +142,7 @@ def evidence_to_dict(artifact, *, max_bytes=DEFAULT_MAX_BYTES):
         raise TypeError("Expected an EvidenceArtifact")
     limit = _budget(max_bytes)
     if len(artifact.resource_json.encode("utf-8")) + len(artifact.payload_json.encode("utf-8")) > limit:
-        raise ValueError("Evidence JSON exceeds max_bytes")
+        raise JSONBudgetExceeded("Evidence JSON exceeds max_bytes")
     body = artifact._body()
     result = {**body, "artifact_id": _artifact_digest(body)}
     canonical_json(result, max_bytes=limit)

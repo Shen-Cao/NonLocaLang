@@ -9,6 +9,10 @@ VERIFIER_ID_PREFIX = "nonlocalgames.verifier.v1:"
 RESOURCE_ID_PREFIX = "nonlocalgames.resource.v2:"
 
 
+class JSONBudgetExceeded(ValueError):
+    """A JSON document exceeds its declared byte limit."""
+
+
 def _json_values(data, active):
     if data is None or isinstance(data, (str, bool, int, float)):
         return
@@ -49,7 +53,7 @@ def canonical_json(data, *, max_bytes=None):
         for chunk in encoder.iterencode(data):
             size += len(chunk.encode("utf-8"))
             if max_bytes is not None and size > max_bytes:
-                raise ValueError("Canonical JSON exceeds max_bytes")
+                raise JSONBudgetExceeded("Canonical JSON exceeds max_bytes")
             chunks.append(chunk)
         return "".join(chunks)
     except RecursionError as error:

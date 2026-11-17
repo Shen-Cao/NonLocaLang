@@ -38,6 +38,7 @@ def gyni():
 def biased_chsh(p):
     """Weight input 11 by p, sharing the remaining probability among 00,01,10."""
     from .core.game import rational
+    from .core.scalar_wire import scalar_string
     p = rational(p)
     if not 0 <= p <= 1:
         raise ValueError("p must be in [0,1]")
@@ -45,7 +46,7 @@ def biased_chsh(p):
                           lambda x, a: (a[0] ^ a[1]) == x[0] * x[1],
                           distribution={(0, 0): (1-p)/3, (0, 1): (1-p)/3,
                                         (1, 0): (1-p)/3, (1, 1): p},
-                          name=f"Biased CHSH ({p})")
+                          name=f"Biased CHSH ({scalar_string(p)})")
 
 
 GAMES = {"chsh": chsh, "ghz": ghz, "magic-square": magic_square, "gyni": gyni}

@@ -18,14 +18,11 @@ to preventing an incorrect mathematical claim.
 
 The M0 claim/evidence fragment is implemented for the standard unrestricted
 resource chain; see [claims](claims.md). M1 now supplies
-[exact quantum lower witnesses](exact-quantum.md). M2 is in progress: the
+[exact quantum lower witnesses](exact-quantum.md). The
 [narrow property layer](properties.md), [bounded scalar wire decoding](scalar-wire.md),
-and [checked relabellings](equivalence.md) are implemented. Canonical orbit
-representatives remain the next stage:
-
-| Stage | Deliverable | Acceptance gate |
-|---|---|---|
-| M2c: canonical XOR corpus | Complete canonicalization of uniform bipartite 3×3 XOR predicates, with an explicit transporter | All 512 distinct verifiers have a checked transporter to one of three representatives. Raw evidence replay proves 480 strict quantum gaps and disproves 32. Incomplete searches issue no canonical ID |
+and [checked relabellings](equivalence.md) support the
+[uniform XOR corpus](xor3.md). Its 512 member-specific gap claims replay from
+raw representative evidence. The protocol semantics checkpoint follows M2c.
 
 The first restricted claim rule for M3 uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target

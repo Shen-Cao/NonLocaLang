@@ -57,6 +57,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Rule builder and JSON | Rational games, resource contracts, and network witnesses | Versioned representation with explicit numerical quantum data |
 | Hidden mixture and parallel product | Explicit local information semantics | Exact construction |
 | [Checked relabellings](docs/equivalence.md) | Local/party bijections with resource and witness transport | Exact inverse/composition; fresh checks of supported transported evidence |
+| [Uniform 3×3 XOR corpus](docs/xor3.md) | Exhaustive local relabelling orbits and strict quantum advantages | Fresh evidence replay on all 512 verifiers |
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |

@@ -21,6 +21,26 @@ that change the experiment require a separate directory. For example:
 python -m nonlocalgames weighted-chsh run output/chsh-coarse --no-screen --grid-denominator 2
 ```
 
+## Reusing the numerical screen
+
+```sh
+python -m nonlocalgames weighted-chsh run output/chsh-template --reuse-screen --max-new 3
+python -m nonlocalgames weighted-chsh run output/chsh-template --reuse-screen
+python -m nonlocalgames weighted-chsh replay output/chsh-template --members
+```
+
+`--reuse-screen` gives each generation invocation one parameterized CVXPY
+program for its fixed question and answer alphabets. A new set of exact
+weighted XOR coefficients supplies the objective for each point. The session
+sets `warm_start=False` and returns independent numerical results. Each
+invocation owns its session, including when two processes publish to the same
+run directory. Replay reconstructs the exact claims directly from saved evidence.
+
+The template policy and effective solver options are part of the v2 run
+identity. To compare policies, generate them in separate run directories.
+Archives made by the default fresh-solve path keep the v1 manifest and remain
+replayable. Both policies use the same rational witness and bound checkers.
+
 ## Evidence at each point
 
 Exact local enumeration supplies a local optimum and a deterministic witness.

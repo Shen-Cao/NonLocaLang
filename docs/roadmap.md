@@ -31,6 +31,14 @@ progress on the weighted CHSH grid. Exact replay is profiled using the
 [weighted three-question family](diagonal-xor3.md) exercises rank-based
 finite quantum attainment and matching rational upper certificates.
 
+The [reusable XOR screen](weighted-chsh.md#reusing-the-numerical-screen)
+binds the template and solver-state policy to each run. The remaining M4
+ledger gate is cross-run search. A query spanning multiple recorded grids
+should group matching verifier and claim IDs, identify overlapping coverage,
+and distinguish replayed proof bounds, numerical candidates, and missing or
+unresolved members. Stored evidence and checker provenance must be recoverable
+for each reported proof.
+
 The [dimension-bounded threshold rule](claims.md#dimension-bounded-thresholds) uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target
 restrictions. Value reductions for product or particular PPT contracts need

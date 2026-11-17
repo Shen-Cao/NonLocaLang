@@ -109,6 +109,26 @@ Use `--method xor-lower-certified --witness` from the game CLI or
 `xor_lower_certified` on an unrestricted bipartite XOR task. See the
 [weighted three-question examples](diagonal-xor3.md) for exact matching bounds.
 
+For repeated numerical screening at one interface, construct a session with
+an explicit solver and call it sequentially:
+
+```python
+from fractions import Fraction
+from nonlocalgames.analysis import XorScreenSession
+from nonlocalgames.games import biased_chsh
+
+first = biased_chsh(Fraction(1, 10))
+session = XorScreenSession(first.scenario, solver="SCS", eps=1e-8)
+scores = [session.solve(game).value for game in (first, biased_chsh(Fraction(1, 4)))]
+```
+
+Each call checks the actual game's parity structure and coefficients before
+assigning the numerical objective. The session keeps the compiled problem
+and disables warm starts. Returned Gram matrices are detached from subsequent
+solves. Concurrent workers require separate sessions. The
+[weighted discovery runner](weighted-chsh.md#reusing-the-numerical-screen)
+records this execution policy alongside its ordinary exact evidence.
+
 ### Explicit quantum witnesses and symbolic CHSH
 
 `QuantumStrategy(state, measurements, tolerance=1e-9)` accepts a density matrix and

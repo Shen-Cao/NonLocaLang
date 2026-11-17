@@ -55,3 +55,10 @@ fixed sample of eight members per XOR3 orbit. It prints separate timing samples
 and hashes of the checked artifact IDs, assessments, and member records.
 Compare those hashes before interpreting timings. Runtime measurements depend
 on the machine and are excluded from correctness assertions.
+
+For the numerical screen, run
+`python scripts/benchmark_xor_screen.py --solver SCS --accuracy 1e-8 --repeats 2`.
+Each balanced block runs the 21-point grid in both method orders. Both paths
+disable warm starts. The JSON report includes the one-time session construction,
+first call, per-point compilation and solver times, and maximum objective
+difference. Compare this screening cost separately from exact verification.

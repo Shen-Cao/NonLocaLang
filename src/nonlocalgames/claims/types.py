@@ -95,6 +95,13 @@ class CertifiedInterval:
     upper_refs: tuple[str, ...] = ()
 
 
+@dataclass(frozen=True, kw_only=True)
+class DimensionInterval(CertifiedInterval):
+    """An interval on the value with specified upper bounds on each local dimension."""
+    target_resource_id: str
+    local_dimensions: tuple[int, ...]
+
+
 @dataclass(frozen=True)
 class ClaimIssue:
     code: ExecutionStatus
@@ -154,6 +161,14 @@ class ClaimAssessment:
         object.__setattr__(self, 'execution', ExecutionStatus(self.execution))
         if self.execution != ExecutionStatus.COMPLETED and self.truth != TruthStatus.UNKNOWN:
             raise ValueError('An operational failure is not a mathematical verdict')
+
+
+@dataclass(frozen=True, kw_only=True)
+class DimensionClaimAssessment(ClaimAssessment):
+    """Value receipt bound to a dimension-limited finite tensor-product contract."""
+    target_resource_id: str
+    local_dimensions: tuple[int, ...]
+    schema: str = field(default='nonlocalgames.dimension_claim_assessment.v1', init=False)
 
 
 class EvidenceError(ValueError):

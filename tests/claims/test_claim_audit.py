@@ -150,7 +150,7 @@ def test_wrong_source_kind_and_restricted_claims_stay_unsupported():
     wrong_source = make_evidence(game, QUANTUM, EvidenceKind.NONSIGNALLING_LP, payload)
     result = assess_value(game, ValueClaim(QUANTUM, 'at_most', 1), [wrong_source])
     assert result.truth == TruthStatus.UNKNOWN and result.execution == ExecutionStatus.UNSUPPORTED
-    for resource in (ResourceSpec('quantum_finite', (2, 2)),
+    for resource in (ResourceSpec('quantum_finite', (2, 2), state_constraint='product'),
                      ResourceSpec('quantum_finite', measurement_class='projective'),
                      ResourceSpec('local', shared_randomness='forbidden')):
         result = assess_value(game, ValueClaim(resource, 'at_least', '3/4'), [_local(game)])

@@ -5,7 +5,8 @@ from ..core.identity import canonical_json, resource_id, verifier_id
 from ..core.scalar_wire import scalar_string
 from .resources import includes, is_standard
 from .admission import verify_evidence_bundle
-from .types import (ClaimAssessment, ClaimIssue,
+from .dimensions import dimension_interval, dimension_only
+from .types import (ClaimAssessment, ClaimIssue, DimensionClaimAssessment,
                     ExecutionStatus, GapClaim, TruthStatus, ValueClaim, ValueRelation,
                     VerificationBudget)
 
@@ -49,15 +50,7 @@ def _prepare(game, claim, artifacts, budget):
             bundle.verified_evidence, bundle.numerical_hints, bundle.checks)
 
 
-def assess_value(game, claim, artifacts=(), *, budget=None):
-    """Resolve a threshold claim when certified bounds suffice; hints never suffice."""
-    if not isinstance(claim, ValueClaim):
-        raise TypeError('Expected ValueClaim')
-    prepared = _prepare(game, claim, artifacts, budget)
-    if isinstance(prepared, ClaimAssessment):
-        return prepared
-    intervals, rules, proofs, hints, checks = prepared
-    interval = intervals[claim.resource.kind]
+def _threshold_verdict(claim, interval):
     lower, upper, threshold = interval.lower, interval.upper, claim.threshold
     truth = TruthStatus.UNKNOWN
     if claim.relation == ValueRelation.AT_LEAST:
@@ -70,7 +63,41 @@ def assess_value(game, claim, artifacts=(), *, budget=None):
             truth = TruthStatus.PROVED
         elif lower is not None and lower > threshold:
             truth = TruthStatus.DISPROVED
-    return ClaimAssessment(claim_id(game, claim), verifier_id(game), truth,
+    return truth
+
+
+def _dimension_value(game, claim, artifacts, budget):
+    if budget is not None and not isinstance(budget, VerificationBudget):
+        raise TypeError('Expected VerificationBudget')
+    caps = claim.resource.local_dimensions
+    scope = dict(claim_id=claim_id(game, claim), game_id=verifier_id(game),
+                 local_dimensions=caps, target_resource_id=resource_id(claim.resource))
+    if len(caps) != game.scenario.parties:
+        issue = ClaimIssue(ExecutionStatus.UNSUPPORTED, 'Dimension bounds must match the party count')
+        return DimensionClaimAssessment(**scope, truth=TruthStatus.UNKNOWN, execution=issue.code, issues=(issue,))
+    bundle = verify_evidence_bundle(game, artifacts, budget=budget)
+    scope.update(verified_evidence=bundle.verified_evidence, numerical_hints=bundle.numerical_hints,
+                 checks=bundle.checks)
+    if bundle.execution != ExecutionStatus.COMPLETED:
+        return DimensionClaimAssessment(**scope, truth=TruthStatus.UNKNOWN, execution=bundle.execution,
+                                        issues=bundle.issues)
+    interval, rules = dimension_interval(bundle, caps, scope['target_resource_id'])
+    return DimensionClaimAssessment(**scope, truth=_threshold_verdict(claim, interval),
+                                    execution=ExecutionStatus.COMPLETED, intervals=(interval,), derivation=rules)
+
+
+def assess_value(game, claim, artifacts=(), *, budget=None):
+    """Resolve a threshold claim under a standard resource or explicit local dimension bounds."""
+    if not isinstance(claim, ValueClaim):
+        raise TypeError('Expected ValueClaim')
+    if dimension_only(claim.resource):
+        return _dimension_value(game, claim, artifacts, budget)
+    prepared = _prepare(game, claim, artifacts, budget)
+    if isinstance(prepared, ClaimAssessment):
+        return prepared
+    intervals, rules, proofs, hints, checks = prepared
+    interval = intervals[claim.resource.kind]
+    return ClaimAssessment(claim_id(game, claim), verifier_id(game), _threshold_verdict(claim, interval),
         ExecutionStatus.COMPLETED, (interval,), proofs, hints, rules, checks=checks)
 
 

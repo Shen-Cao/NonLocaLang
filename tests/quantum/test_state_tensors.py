@@ -43,6 +43,15 @@ def test_fixed_state_is_validated_and_immutable():
         FixedState(np.eye(4)/4, (2, 2), tolerance=np.nan)
 
 
+def test_trivial_factors_do_not_change_marginals_or_ppt_constraints():
+    left, right = _pure([1, 1j]), _pure([1, 1j, -1])
+    state = np.kron(left, right)
+    dimensions = (2,) + (1,)*40 + (3,)
+    np.testing.assert_allclose(partial_trace(state, dimensions, (41, 25, 0)), np.kron(right, left))
+    np.testing.assert_allclose(partial_transpose(state, dimensions, (25, 41)), np.kron(left, right.T))
+    assert FixedState(state, dimensions).validate(ppt_cuts=((25, 41),))["minimum_ppt_eigenvalue"] > -1e-9
+
+
 def test_ppt_validation_and_cut_canonicalization():
     assert validate_ppt_cuts(((1,),), 2) == ((0,),)
     for cuts in (((),), ((0, 1),), ((2,),), ((0,), (1,))):

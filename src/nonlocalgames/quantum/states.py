@@ -48,6 +48,13 @@ def _matrix(state, dimensions):
     return matrix
 
 
+def _active_axes(dimensions, selected):
+    """Drop one-dimensional tensor axes from the computation, preserving selected order."""
+    active = [i for i, size in enumerate(dimensions) if size > 1]
+    axis = {party: i for i, party in enumerate(active)}
+    return tuple(dimensions[i] for i in active), tuple(axis[i] for i in selected if i in axis)
+
+
 def partial_trace(state, dimensions, keep):
     """Trace out other factors, returning the kept factors in the requested order.
 
@@ -55,9 +62,11 @@ def partial_trace(state, dimensions, keep):
     """
     dimensions = validate_dimensions(dimensions)
     keep = _indices(keep, len(dimensions))
+    matrix = _matrix(state, dimensions)
+    dimensions, keep = _active_axes(dimensions, keep)
     traced = tuple(i for i in range(len(dimensions)) if i not in keep)
     order = keep + traced
-    tensor = _matrix(state, dimensions).reshape(dimensions + dimensions)
+    tensor = matrix.reshape(dimensions + dimensions)
     tensor = tensor.transpose(order + tuple(i + len(dimensions) for i in order))
     kept_size = prod(dimensions[i] for i in keep)
     traced_size = prod(dimensions[i] for i in traced)
@@ -69,11 +78,13 @@ def partial_transpose(state, dimensions, parties):
     """Transpose selected local factors in their computational bases."""
     dimensions = validate_dimensions(dimensions)
     parties = _indices(parties, len(dimensions))
+    matrix = _matrix(state, dimensions)
+    dimensions, parties = _active_axes(dimensions, parties)
     order = list(range(2 * len(dimensions)))
     for i in parties:
         order[i], order[i + len(dimensions)] = order[i + len(dimensions)], order[i]
     size = prod(dimensions)
-    return _matrix(state, dimensions).reshape(dimensions + dimensions).transpose(order).reshape(size, size)
+    return matrix.reshape(dimensions + dimensions).transpose(order).reshape(size, size)
 
 
 def state_diagnostics(state, dimensions, *, tolerance=1e-9, ppt_cuts=()):

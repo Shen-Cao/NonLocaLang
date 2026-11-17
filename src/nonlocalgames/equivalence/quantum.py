@@ -2,6 +2,7 @@
 from numbers import Integral
 from operator import index
 
+from ..core._tensor import _basis_indices
 from ..core.numeric_data import positive_budget
 from .maps import RelabellingBudgetExceeded
 
@@ -33,22 +34,6 @@ def _factor_preflight(dimensions, permutation, max_joint_dimension, max_matrix_e
     if total > entry_limit // total:
         raise RelabellingBudgetExceeded('Quantum state relabelling exceeds max_matrix_entries')
     return dimensions, permutation, total
-
-
-def _basis_indices(dimensions, permutation, total):
-    """New basis index -> old basis index; no physical dimension is changed."""
-    target_dimensions = tuple(dimensions[p] for p in permutation)
-    indices = []
-    for new_index in range(total):
-        remainder, source_coordinates = new_index, [0]*len(dimensions)
-        for target_party in range(len(dimensions)-1, -1, -1):
-            remainder, coordinate = divmod(remainder, target_dimensions[target_party])
-            source_coordinates[permutation[target_party]] = coordinate
-        source_index = 0
-        for coordinate, dimension in zip(source_coordinates, dimensions):
-            source_index = source_index*dimension + coordinate
-        indices.append(source_index)
-    return tuple(indices)
 
 
 def _permute_numeric_density(state, dimensions, party_permutation, *,

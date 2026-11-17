@@ -6,6 +6,7 @@ from numbers import Integral
 
 import numpy as np
 
+from ..core._tensor import _basis_indices
 from ..quantum.strategy import QuantumStrategy
 from ..quantum.states import FixedState, state_diagnostics
 from .structure import SourceNetwork
@@ -69,8 +70,9 @@ class QuantumNetworkStrategy:
             cursor += len(source.dimensions)
         permutation = tuple(offsets[s] + endpoint for ports in self.network.party_ports for s, endpoint in ports)
         state = reduce(np.kron, (source.state for source in sources), np.ones((1, 1)))
-        if dims:
-            state = state.reshape(dims + dims).transpose(permutation + tuple(i + len(dims) for i in permutation)).reshape(total, total)
+        if permutation != tuple(range(len(dims))):
+            indices = _basis_indices(dims, permutation, total)
+            state = state[np.ix_(indices, indices)]
         strategy = QuantumStrategy(state, self.measurements, self.tolerance)
         expected = tuple(prod(sources[s].dimensions[e] for s, e in ports) for ports in self.network.party_ports)
         if strategy.dimensions != expected:

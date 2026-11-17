@@ -3,7 +3,7 @@ from fractions import Fraction
 import numpy as np
 import pytest
 
-from nonlocalgames import Scenario
+from nonlocalgames import AnalysisTask, Game, ResourceSpec, Scenario
 from nonlocalgames.networks import (BILOCAL_SCENARIO, QuantumNetworkStrategy, QuantumSource,
                                    SourceNetwork, bilocal_deterministic_branches,
                                    bilocal_entanglement_swapping, bilocal_witness)
@@ -35,19 +35,34 @@ def test_nonlinear_witness_exact_and_global_randomness_counterexample():
     assert witness.value == pytest.approx(np.sqrt(2))
 
 
-def test_source_permutation_with_complex_unequal_endpoint_factors():
-    graph = SourceNetwork(3, ((2, 0), (1, 2)))
+@pytest.mark.parametrize("extra_sources", [0, 40])
+def test_source_permutation_with_complex_unequal_endpoint_factors(extra_sources):
+    graph = SourceNetwork(3, ((2, 0),) + ((2,),)*extra_sources + ((1, 2),))
     # Original factors: party2 dim2, party0 dim3, party1 dim2, party2 dim3.
     vectors = [np.array([1, 1j])/np.sqrt(2), np.array([0, 1, 0]),
                np.array([0, 1]), np.array([1, 0, 1j])/np.sqrt(2)]
     psi0, psi1 = np.kron(*vectors[:2]), np.kron(*vectors[2:])
+    scalar_sources = (QuantumSource(np.ones((1, 1)), (1,)),)*extra_sources
     sources = (QuantumSource(np.outer(psi0, psi0.conj()), (2, 3)),
-               QuantumSource(np.outer(psi1, psi1.conj()), (2, 3)))
+               *scalar_sources, QuantumSource(np.outer(psi1, psi1.conj()), (2, 3)))
     dims = (3, 2, 6)
     strategy = QuantumNetworkStrategy(graph, sources, tuple(((np.eye(d),),) for d in dims))
     expected = np.kron(np.kron(vectors[1], vectors[2]), np.kron(vectors[0], vectors[3]))
     np.testing.assert_allclose(strategy.as_strategy().state, np.outer(expected, expected.conj()))
     np.testing.assert_allclose(strategy.probabilities(Scenario((1, 1, 1), (1, 1, 1))), [1])
+
+
+@pytest.mark.parametrize("parties, sources", [(1, ((0,),)*40), (40, ())])
+def test_product_network_solve_and_evaluate_many_scalar_factors(parties, sources):
+    game = Game(Scenario((1,)*parties, (1,)*parties), (1,), (1,))
+    resource = ResourceSpec("quantum_finite", state_constraint="product",
+                            shared_randomness="forbidden", network=SourceNetwork(parties, sources))
+    task = AnalysisTask(game, resource)
+    result = task.solve()
+    assert result.value == 1 and result.guarantee == "exact"
+    assert result.witness.network == resource.network
+    checked = task.evaluate(result.witness)
+    assert checked.value == 1 and checked.guarantee == "numerical_witness"
 
 
 def test_isolated_quantum_parties_and_dimension_guards():

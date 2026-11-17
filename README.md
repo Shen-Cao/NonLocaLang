@@ -58,6 +58,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Hidden mixture and parallel product | Explicit local information semantics | Exact construction |
 | [Checked relabellings](docs/equivalence.md) | Local/party bijections with resource and witness transport | Exact inverse/composition; fresh checks of supported transported evidence |
 | [Uniform 3×3 XOR corpus](docs/xor3.md) | Exhaustive local relabelling orbits and strict quantum advantages | Fresh evidence replay on all 512 verifiers |
+| [Hidden classical wirings](docs/wiring.md) | Independent kept/sent preparations and one shared response strategy across routes | Exact constructive compatibility and local marginal contradictions |
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |

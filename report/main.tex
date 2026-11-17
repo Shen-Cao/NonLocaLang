@@ -40,6 +40,9 @@ decision procedure or a claim that arbitrary games have efficient analyses.
 \begingroup
 \small
 \setcounter{tocdepth}{1}
+\makeatletter
+\renewcommand{\l@section}{\@dottedtocline{1}{0em}{2em}}
+\makeatother
 \tableofcontents
 \endgroup
 \clearpage
@@ -59,6 +62,8 @@ decision procedure or a claim that arbitrary games have efficient analyses.
 \input{sections/14_exact_quantum}
 \input{sections/15_properties}
 \input{sections/16_relabellings}
+\input{sections/17_calibration}
+\input{sections/18_wiring}
 \bibliographystyle{plainurl}
 \bibliography{bibliography}
 \end{document}

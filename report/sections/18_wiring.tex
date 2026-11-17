@@ -1,0 +1,51 @@
+\section{Joint compatibility in a hidden wiring family}
+
+In a blind exchange, each laboratory prepares a pair of ports and keeps one.
+An independent referee redistributes the sent ports by a hidden permutation.
+Questions arrive after this exchange. The rewiring experiment of
+Moradi Kalarde et al.~\cite{kalarde2026fermions} uses this information constraint
+to compare information carriers. Here we consider a finite classical fragment
+with independently prepared pairs and visible sender identities.
+
+Write $r_i$ for the sender whose transmitted port arrives at receiver $i$.
+For each allowed route $r$ a target specifies the complete set of conditional
+probabilities $P_r(a\mid x)$. A witness chooses one joint probability law
+$q_j(k_j,s_j)$ for each source $j$, with independent draws across sources.
+At receiver $i$, the response is a stochastic kernel $D_{i,r_i}$ indexed by
+its question, its retained value, and the incoming value. Source laws and
+response tables are shared across routes. The compatibility equation is
+\[
+ P_r(a\mid x)=
+ \sum_{k,s}\left(\prod_j q_j(k_j,s_j)\right)
+             \prod_i D_{i,r_i}(a_i\mid x_i,k_i,s_{r_i}) .
+\]
+The quantifier over the witness precedes the quantifier over the route.
+When $r_i=i$, the two observed ports belong to the same draw from $q_i$.
+
+\begin{proposition}
+If $r_i=r'_i$, any joint realization gives the same unconditional output
+marginal at party $i$ for a fixed local question in routes $r,r'$.
+\end{proposition}
+\begin{proof}
+Sum the compatibility equation over the other answers. Each other response
+kernel sums to one for each latent assignment. The remaining expectation
+depends only on $D_{i,r_i}$ and the joint law of $(k_i,s_{r_i})$. For
+$r_i\ne i$ that law is the product of the two corresponding marginals of the
+local preparations. For $r_i=i$ it is $q_i$ itself. Both the law and the
+kernel agree across the two routes.
+\end{proof}
+
+For example, take routes $(2,0,1)$ and $(2,1,0)$ for receivers in order A,B,C.
+If Alice must always output zero on the first route and one on the second at
+the same question, each branch separately admits a deterministic witness.
+Alice receives Charlie's port in both, so the proposition excludes a common
+witness. For a compatible control let each party keep and send a copy of its
+own fair bit, then output the XOR of its two observed bits. A three-cycle
+yields a uniform even-parity triple. On a two-cycle the excluded party outputs
+zero, and the two participating parties have the same fair output.
+
+The evaluator verifies a supplied finite rational witness by direct summation.
+The marginal rule can establish impossibility for arbitrary finite classical
+port alphabets. Agreement of all tested marginals leaves the existence question
+open in the absence of a matching witness. A claim about fermionic transmission
+requires its own carrier algebra and admissibility rules.

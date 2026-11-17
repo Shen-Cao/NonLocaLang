@@ -1,0 +1,51 @@
+\section{A finite calibration corpus}
+
+Consider the uniform three-question bipartite XOR games. Write the winning
+parity at question pair $(i,j)$ as $F_{ij}\in\{0,1\}$. Each of the $512$
+matrices $F$ represents a different labelled verifier. Local answer flips add
+a row bit and a column bit modulo two. For any fixed ordering of questions
+and parties, the least row-major mask in the answer-flip orbit has first row
+and first column zero. Indeed, column flips can zero the first row, then each
+subsequent row flip can zero its leading entry. These conditions determine the
+resulting table uniquely:
+\[
+ T_{ij}=F_{ij}\mathbin{\oplus} F_{i0}\mathbin{\oplus} F_{0j}
+                  \mathbin{\oplus} F_{00}.
+\]
+Here $F$ already has the chosen question and party ordering. Minimizing the
+result over $2(3!)^2=72$ orderings gives the least mask under all the declared
+relabellings. Recording the maps yields a transporter to that representative.
+
+\begin{center}
+\begin{tabular}{lrrr}
+\toprule
+Representative & Orbit size & Local value & Attained quantum score\\
+\midrule
+\texttt{000000000} & 32  & $1$   & $1$\\
+\texttt{000000001} & 288 & $8/9$ & $401/450$\\
+\texttt{000001010} & 192 & $7/9$ & $187/225$\\
+\bottomrule
+\end{tabular}
+\end{center}
+The table gives the witnesses used in the portable calibration corpus. The
+local values have exact enumeration certificates. For the last two rows the
+quantum scores come from rational projective measurements on a two-qubit Bell
+state. Transport and independent checking prove a strict quantum advantage
+for all $480$ labelled members of those two orbits. The remaining $32$ admit
+perfect local play and an upper certificate of one.
+
+For the third representative a different witness attains the exact optimum
+$5/6$. Take four pairwise anticommuting Hermitian involutions given by the Pauli
+strings $G_0=X\otimes I$, $G_1=Y\otimes I$, $G_2=Z\otimes X$, and
+$G_3=Z\otimes Y$. Write $H=G_1+G_2+G_3$. Alice measures the observables
+$G_0,(G_0+H)/2,(G_0-H)/2$ and Bob uses their transposes on a maximally
+entangled state of local dimension four. Anticommutation makes each observable
+an involution. The Bell-state correlator is the normalized trace of the
+two observables' product after transposing Bob's operator. In row-major
+order the nine correlators are
+\[
+ 1,\ 1/2,\ 1/2,\quad 1/2,\ 1,\ -1/2,\quad 1/2,\ -1/2,\ 1.
+\]
+Their signed sum is six, giving score $1/2+6/18=5/6$. In the score convention
+of Section~\ref{sec:xorcertificates}, an exact feasible XOR dual with all six
+diagonal entries equal to $1/18$ gives the same upper bound.

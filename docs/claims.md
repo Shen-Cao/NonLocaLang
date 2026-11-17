@@ -27,10 +27,10 @@ The initial inference rules use only the unrestricted standard models:
 `local ⊆ quantum_finite ⊆ quantum_closure ⊆ quantum_commuting ⊆ nonsignalling`.
 
 A lower bound propagates toward larger sets, and an upper bound toward smaller
-sets. This is a value rule, not a membership or attainment rule. Dimension bounds,
-fixed states, source networks, PPT/projective restrictions, and nondefault
-randomness policies remain available to the analysis APIs, but claim inference
-returns unsupported until an explicit rule covers them. Numerical hints may
+sets. This implication compares suprema. A separate rule below handles finite
+quantum value claims with dimension bounds. Fixed states, source networks,
+PPT/projective restrictions, and nondefault randomness policies require other
+checked rules. Numerical hints may
 retain such a restricted source context without contributing mathematical bounds.
 
 For an interval `[L,U]`, `value >= t` is proved by `L >= t` and disproved by
@@ -68,6 +68,32 @@ External `AnalysisResult` objects and externally constructed checker-output
 objects are not evidence inputs. The `Guarantee` enum validates vocabulary and
 scalar types, but an `exact` label does not establish a fact. Numerical hints
 remain hints even if their payload falsely contains `guarantee="exact"`.
+
+## Dimension-bounded thresholds
+
+`assess_value` accepts a finite tensor-product POVM contract whose only added
+restriction is one local dimension upper bound per party. A verified quantum
+witness gives its attained score as a lower bound when every physical dimension
+fits the corresponding cap. A checked deterministic local strategy can also be
+realized using dimension one at every party. Upper bounds on the unrestricted
+finite quantum value descend to this smaller set. A larger witness that fails
+the fit test supplies no scoped lower bound. Contradictory unrestricted
+evidence still quarantines the query before applying the dimension rule.
+
+The dimension assessment and its interval bind the full target resource ID
+and ordered dimension tuple. The receipt schema is
+`nonlocalgames.dimension_claim_assessment.v1`. Restricted gap and
+perfect-strategy queries retain their separate admission rules.
+
+To replay a saved threshold or gap in a fresh process, use:
+
+```sh
+python -m nonlocalgames claim verifier.json definition.json evidence.json
+```
+
+Use the finite game codec for the verifier, `claim_to_dict` for the definition,
+and a JSON array of `evidence_to_dict` envelopes. The reader checks the
+definition's binding and replays each raw artifact under the supplied budgets.
 
 ## Example
 

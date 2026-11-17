@@ -28,7 +28,7 @@ cross-route marginal test. The first [M3 discovery run](weighted-chsh.md)
 links numerical screening, rational witnesses, exact verdicts, and persistent
 progress on the weighted CHSH grid.
 
-The first restricted claim rule for M3 uses an attained finite-dimensional score
+The [dimension-bounded threshold rule](claims.md#dimension-bounded-thresholds) uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target
 restrictions. Value reductions for product or particular PPT contracts need
 separate proofs. Broader NPA, quantum inflation,

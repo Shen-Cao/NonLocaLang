@@ -40,6 +40,9 @@ def result_record(result, include_witness=False):
 
 def main(argv=None):
     argv = list(sys.argv[1:] if argv is None else argv)
+    if argv and argv[0] == "claim":
+        from .claim_cli import main as claim_main
+        return claim_main(argv[1:])
     if argv and argv[0] == "weighted-chsh":
         from .discovery_cli import main as discovery_main
         return discovery_main(argv[1:])
@@ -59,7 +62,7 @@ def main(argv=None):
         from .task_cli import main as task_main
         return task_main(argv[1:])
     parser = argparse.ArgumentParser(description=__doc__,
-                                     epilog="Subcommands: task, network, property, xor3, wiring, weighted-chsh. Use COMMAND --help for options.")
+                                     epilog="Subcommands: task, network, claim, property, xor3, wiring, weighted-chsh. Use COMMAND --help for options.")
     parser.add_argument("game", choices=tuple(GAMES) + ("json",))
     parser.add_argument("--file", help="versioned verifier JSON, required for game=json")
     parser.add_argument("--method", choices=("local", "ns", "ns-exact", "npa1", "npa1ab", "xor", "xor-certified"),

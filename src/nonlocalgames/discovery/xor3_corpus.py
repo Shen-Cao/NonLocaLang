@@ -3,10 +3,11 @@ from collections import Counter
 
 from ..claims import GapClaim, assess_gap, evidence_from_dict, evidence_to_dict
 from ..core.identity import canonical_json, verifier_id
+from ..core.json_file import read_json
 from ..core.resources import ResourceSpec
 from ..core.scalar_wire import scalar_string
 from ..equivalence import relabel_evidence, relabel_game, relabelling_to_dict
-from ._xor3_archive import read_archive, write_archive
+from ._xor3_archive import write_archive
 from .xor3 import XOR3_ACTION, XOR3_FAMILY, canonicalize_xor3, xor3_game
 from .xor3_evidence import representative_evidence
 
@@ -94,7 +95,7 @@ def _decode_representatives(rows):
 
 def replay_xor3_corpus(path, *, max_file_bytes=8_000_000):
     """Rebuild all verifiers and recheck archived raw proofs against each target claim."""
-    archive = read_archive(path, max_file_bytes)
+    archive = read_json(path, max_file_bytes=max_file_bytes)
     if (not isinstance(archive, dict) or set(archive) != {*_HEADER, 'representatives', 'members'}
             or any(archive[key] != value for key, value in _HEADER.items())):
         raise ValueError('Invalid XOR3 archive fields, family, action or query')

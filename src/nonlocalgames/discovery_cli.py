@@ -26,6 +26,8 @@ def main(argv=None):
     run.add_argument("--steps", type=int, default=20, help="sample p=k/steps, including both endpoints")
     run.add_argument("--grid-denominator", type=int, default=16, help="denominator of the rational witness grid")
     run.add_argument("--no-screen", dest="screen", action="store_false", help="skip the numerical XOR screen")
+    run.add_argument("--reuse-screen", action="store_true",
+                     help="reuse a parameterized XOR program within this invocation, with cold solver state")
     run.add_argument("--solver", default="SCS", help="requested numerical screen solver")
     run.add_argument("--eps", type=float, default=1e-8, help="SCS accuracy setting")
     run.add_argument("--max-new", type=int, help="stop after this many new member records")
@@ -39,7 +41,8 @@ def main(argv=None):
         budget = _budget(args.budget)
         if args.command == "run":
             result = run_weighted_chsh(args.directory, steps=args.steps, grid_denominator=args.grid_denominator,
-                                       screen=args.screen, solver=args.solver, eps=args.eps, max_new=args.max_new,
+                                       screen=args.screen, reuse_screen=args.reuse_screen,
+                                       solver=args.solver, eps=args.eps, max_new=args.max_new,
                                        verification_budget=budget)
         else:
             result = replay_weighted_chsh(args.directory, budget=budget, include_members=args.members)

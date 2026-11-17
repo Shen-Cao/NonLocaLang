@@ -33,14 +33,43 @@ def _local_value(result):
     return None
 
 
-def _screen(game, manifest, local):
-    if not manifest['screen']:
-        return {'status': 'disabled'}
+def prepare_template(manifest):
+    """Return an invocation-local screening method or a recorded initialization failure."""
+    if manifest.get('template_policy') != 'fresh_solver_state':
+        raise ValueError('Expected the fresh_solver_state template policy')
     try:
         import cvxpy as cp
+    except ImportError as error:
+        return None, {'status': 'unavailable', 'detail': str(error)}
+    try:
         if manifest['solver'] not in cp.installed_solvers():
-            return {'status': 'unavailable', 'detail': 'Requested solver is unavailable'}
-        result = xor_quantum_value(game, solver=manifest['solver'], **manifest['solver_options'])
+            return None, {'status': 'unavailable', 'detail': 'Requested solver is unavailable'}
+        from ..analysis.xor_template import XorScreenSession
+        session = XorScreenSession(biased_chsh(0).scenario, solver=manifest['solver'],
+                                   **manifest['solver_options'])
+        return session.solve, None
+    except ImportError as error:
+        return None, {'status': 'unavailable', 'detail': str(error)}
+    except (cp.error.SolverError, RuntimeError, ValueError) as error:
+        return None, {'status': 'failed', 'detail': str(error)}
+
+
+def _screen(game, manifest, local, template=None):
+    if not manifest['screen']:
+        return {'status': 'disabled'}
+    if template is not None and template[1] is not None:
+        return template[1].copy()
+    try:
+        import cvxpy as cp
+        if template is not None:
+            solve, _ = template
+            result = solve(game)
+        else:
+            if 'template_policy' in manifest:
+                raise RuntimeError('Template run has no screening session')
+            if manifest['solver'] not in cp.installed_solvers():
+                return {'status': 'unavailable', 'detail': 'Requested solver is unavailable'}
+            result = xor_quantum_value(game, solver=manifest['solver'], **manifest['solver_options'])
     except ImportError as error:
         return {'status': 'unavailable', 'detail': str(error)}
     except (cp.error.SolverError, RuntimeError, ValueError) as error:
@@ -71,7 +100,7 @@ def _check_screen(screen, manifest, local):
         raise ValueError('Numerical candidate gap differs from the reported score and exact local value')
 
 
-def generate_member(manifest, k, budget):
+def generate_member(manifest, k, budget, *, template=None):
     p = Fraction(k, manifest['steps'])
     game = biased_chsh(p)
     error = None
@@ -90,7 +119,7 @@ def generate_member(manifest, k, budget):
     if result is not None and result.execution != 'completed':
         raise ValueError(f'Generated member evidence rejected: {result.execution.value}')
     local = _local_value(result)
-    screen = _screen(game, manifest, local)
+    screen = _screen(game, manifest, local, template)
     _check_screen(screen, manifest, local)
     body = {**_binding(manifest, k, p, game), 'generation_error': error, 'screen': screen,
             'evidence': [evidence_to_dict(a, max_bytes=budget.max_artifact_bytes) for a in artifacts],

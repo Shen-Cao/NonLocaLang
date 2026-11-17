@@ -4,7 +4,7 @@ from numbers import Integral
 from pathlib import Path
 
 from ._checkpoint import MANIFEST_BYTES, MEMBER_BYTES, load_checkpoint, prefix_size, publish
-from ._weighted_record import generate_member, verify_member
+from ._weighted_record import generate_member, prepare_template, verify_member
 from .run_manifest import create_manifest, replay_budget, validate_manifest
 
 
@@ -45,7 +45,7 @@ def _summary(manifest, reviewed, include_members=False):
 
 
 def run_weighted_chsh(directory, *, steps=20, grid_denominator=16, screen=True, solver='SCS',
-                      eps=1e-8, verification_budget=None, max_new=None):
+                      eps=1e-8, verification_budget=None, max_new=None, reuse_screen=False):
     """Verify an existing prefix and publish up to max_new additional member checkpoints.
 
     Concurrent writers may repeat discovery for the same parameter. The first
@@ -55,13 +55,15 @@ def run_weighted_chsh(directory, *, steps=20, grid_denominator=16, screen=True, 
     if max_new is not None and (isinstance(max_new, bool) or not isinstance(max_new, Integral) or max_new < 0):
         raise ValueError('max_new must be a nonnegative integer')
     desired = create_manifest(steps=steps, grid_denominator=grid_denominator, screen=screen,
-                              solver=solver, eps=eps, verification_budget=verification_budget)
+                              solver=solver, eps=eps, verification_budget=verification_budget,
+                              reuse_screen=reuse_screen)
     directory = Path(directory)
     manifest = _prepare_directory(directory, desired)
     budget = replay_budget(manifest, verification_budget)
     members = directory / 'members'
     existing = prefix_size(members, manifest['steps'])
     reviewed, added = [], 0
+    template = None
     for k in range(manifest['steps'] + 1):
         path = members / f'{k}.json'
         if k < existing or path.exists():
@@ -69,7 +71,12 @@ def run_weighted_chsh(directory, *, steps=20, grid_denominator=16, screen=True, 
         elif max_new is not None and added >= max_new:
             break
         else:
-            record = generate_member(manifest, k, budget)
+            if reuse_screen:
+                if template is None:
+                    template = prepare_template(manifest)
+                record = generate_member(manifest, k, budget, template=template)
+            else:
+                record = generate_member(manifest, k, budget)
             computed = verify_member(manifest, k, record, budget)
             if publish(path, record, MEMBER_BYTES):
                 reviewed.append(computed)

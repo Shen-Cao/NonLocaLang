@@ -12,12 +12,15 @@ __all__ = ['exact_scalar', 'scalar_bits', 'scalar_string']
 def exact_scalar(value, *, max_bits=4096):
     """Accept explicit exact numbers and canonical fraction strings, never floats.
 
-    The shared core parser handles arithmetic and preconversion bounds. This
-    policy retains the exact quantum wire's stricter canonical syntax and maps
-    scalar-budget failures to the exact quantum budget exception. The character
-    budget grows with an explicitly increased bit limit; it is not fixed at the
-    more permissive legacy parser's default character limit.
+    Native Fraction inputs are copied after bounding their integer components.
+    The shared wire parser checks canonical text and other exact input types.
+    Its character budget grows with the configured bit limit.
     """
+    if type(value) is Fraction and type(max_bits) is int and max_bits > 0:
+        numerator, denominator = value.numerator, value.denominator
+        if (type(numerator) is int and type(denominator) is int and denominator > 0
+                and numerator.bit_length() <= max_bits and denominator.bit_length() <= max_bits):
+            return Fraction(numerator, denominator)
     if isinstance(max_bits, bool) or not isinstance(max_bits, Integral) or max_bits < 1:
         raise ValueError('max_bits must be a positive integer')
     if isinstance(value, bool) or not isinstance(value, (Fraction, Integral, str)):

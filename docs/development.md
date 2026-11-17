@@ -45,3 +45,13 @@ Stage named paths for one coherent change. Use conventional commit subjects such
 as `feat(core): ...`, `feat(analysis): ...`, `test: ...`, and `docs(research): ...`.
 Put editorial history and implementation decisions in commit messages; keep source
 comments and research prose about semantics, reasoning, and reproducible use.
+
+## Comparing replay cost
+
+Run `python scripts/benchmark_replay.py --repeats 4` with each installed revision
+in the same environment. The script warms the workload, times 21 weighted CHSH
+members without a numerical screen, replays their raw evidence, and checks a
+fixed sample of eight members per XOR3 orbit. It prints separate timing samples
+and hashes of the checked artifact IDs, assessments, and member records.
+Compare those hashes before interpreting timings. Runtime measurements depend
+on the machine and are excluded from correctness assertions.

@@ -89,6 +89,40 @@ def test_numpy_fraction_components_remain_unbounded_python_integers():
     assert value*second == Fraction(1, 2**40*(2**40-1))
 
 
+def test_native_fraction_copy_normalizes_only_after_component_limits_and_preserves_errors():
+    import numpy as np
+    supplied = Fraction(1, 2)
+    # Simulate a noncanonical pair, including invalid data from foreign producers.
+    supplied._numerator, supplied._denominator = -6, 8
+    normalized = exact_scalar(supplied, max_bits=4)
+    assert normalized is not supplied
+    assert (normalized.numerator, normalized.denominator) == (-3, 4)
+    with pytest.raises(ExactBudgetExceeded) as failure:
+        exact_scalar(supplied, max_bits=3)
+    assert isinstance(failure.value.__cause__, ScalarBudgetExceeded)
+    with pytest.raises(ValueError, match='positive integer'):
+        exact_scalar(supplied, max_bits=True)
+    supplied._denominator = -8
+    assert exact_scalar(supplied, max_bits=np.int64(4)) == Fraction(3, 4)
+    supplied._denominator = 0
+    with pytest.raises(ValueError, match='nonzero'):
+        exact_scalar(supplied)
+    assert normalized == Fraction(-3, 4)
+
+
+def test_native_fraction_copy_preserves_chsh_evidence_identity():
+    from nonlocalgames import ResourceSpec
+    from nonlocalgames.analysis import certify_quantum_strategy
+    from nonlocalgames.claims import make_evidence
+    from nonlocalgames.games import chsh
+    from nonlocalgames.quantum.exact import exact_chsh_strategy
+    game = chsh()
+    certificate = certify_quantum_strategy(game, exact_chsh_strategy())
+    artifact = make_evidence(game, ResourceSpec('quantum_finite'), 'quantum_strategy', certificate.witness)
+    assert certificate.value == Fraction(3880899, 4546756)
+    assert artifact.artifact_id == 'nonlocalgames.evidence.v1:0ea54b39168f0b2c50a7d900c0062fc7a0ea622ea03a534446c8de7068c8d60e'
+
+
 def test_bridge_uses_one_core_parser_with_explicit_canonical_policy(monkeypatch):
     import nonlocalgames.quantum.exact.scalars as bridge
     calls = []

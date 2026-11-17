@@ -59,6 +59,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | [Checked relabellings](docs/equivalence.md) | Local/party bijections with resource and witness transport | Exact inverse/composition; fresh checks of supported transported evidence |
 | [Uniform 3×3 XOR corpus](docs/xor3.md) | Exhaustive local relabelling orbits and strict quantum advantages | Fresh evidence replay on all 512 verifiers |
 | [Resumable weighted CHSH discovery](docs/weighted-chsh.md) | Rational parameter grid with optional numerical screening | Exact member certificates, saved progress, independent proof replay |
+| [Six-mode fermionic reference](docs/fermion-reference.md) | Graded routing and parity-preserving measurements across five hidden wirings | Exact algebraic target comparison and independent detector checks |
 | [Hidden classical wirings](docs/wiring.md) | Independent kept/sent preparations and one shared response strategy across routes | Exact constructive compatibility and local marginal contradictions |
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |

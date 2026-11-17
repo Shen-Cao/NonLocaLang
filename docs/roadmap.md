@@ -91,8 +91,10 @@ at Alice in the two routes is individually feasible in each branch and jointly
 impossible. A shared deterministic response gives a positive control. This
 rational experiment isolates the information constraint in the
 [fermionic rewiring experiment](https://arxiv.org/abs/2606.12363v1).
-Exact graded routing and algebraic measurements are a subsequent research
-extension. The full experiment asks for joint behavior compatibility.
+A [fixed six-mode reference](fermion-reference.md) now evaluates the graded
+route action and algebraic measurements of the specified strategy. The full
+experiment asks for joint behavior compatibility and requires a separate
+exclusion argument.
 
 ## Discovery acceptance experiments
 

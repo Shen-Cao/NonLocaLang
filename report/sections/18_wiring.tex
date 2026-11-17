@@ -49,3 +49,43 @@ The marginal rule can establish impossibility for arbitrary finite classical
 port alphabets. Agreement of all tested marginals leaves the existence question
 open in the absence of a matching witness. A claim about fermionic transmission
 requires its own carrier algebra and admissibility rules.
+
+\subsection{Six-mode fermionic reference}
+
+For the three-party reference of Ref.~\cite{kalarde2026fermions}, treat the
+five nonidentity permutations as routes and the four answers as
+$0,1_+,1_-,2$. The initial state has one particle per origin, with equal
+amplitudes on its kept and sent modes. Fix the output mode order to be
+incoming then retained at each site, with the sites in alphabetical order.
+Number sites and modes from zero. For a send choice $h_i\in\{0,1\}$ at origin
+$i$, the occupied destination mode is
+\[
+ k_i(h)=\begin{cases}
+  2i+1 & h_i=0,\\
+  2r^{-1}(i) & h_i=1 .
+ \end{cases}
+\]
+In the ordered occupation basis the amplitude acquires the sign
+$s_h=(-1)^{\#\{(i,j):i<j,\ k_i(h)>k_j(h)\}}$ from anticommutation.
+Thus each pair of choices $h,h'$ contributes $s_hs_{h'}/8$ to its density
+matrix entry. The zero-phase ordinary tensor reference sets all $s_h=1$.
+
+For each site use the one-particle basis $|01\rangle,|10\rangle$ and the
+plus/minus outcome convention of Eqs.~(B.6), (B.17) and (B.18) of
+Ref.~\cite{kalarde2026fermions}. The observable in this sector is
+$(X+(-1)^x Z)/\sqrt{2}$ for Alice and $Z$ or $X$ for Bob and Charlie.
+Vacuum and double occupation have distinct outcomes. All effects preserve
+particle number, so their product in the final site ordering can be contracted
+against the signed density entries above. The resulting probabilities are
+in $\mathbb{Q}(\sqrt{2})$. For example, on route $ABC$, question $000$,
+the probability of $(1_+,1_+,1_+)$ is $(2+\sqrt{2})/32$.
+
+The reference calculation checks all $2560$ unconditioned probabilities
+for positivity, normalization and nonsignalling in the late questions using
+exact coefficient pairs. An independent numerical implementation propagates
+the three occupied single-particle orbitals and computes squared determinants
+for final detector configurations. The fermionic and ordinary tensor
+references differ at $64$ entries in the full family. This discrepancy compares
+two specified implementations. The paper's stronger exclusion theorem
+quantifies over every admissible uniform qubit strategy and uses rigidity
+across contexts.

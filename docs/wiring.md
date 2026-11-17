@@ -84,6 +84,6 @@ outcome with unknown truth.
 The [fermionic rewiring experiment](https://arxiv.org/abs/2606.12363v1)
 motivates the timing, persistent port ownership, and local-view constraint.
 The executable resource here is independent finite classical preparation with
-rational probability tables for its constructive witnesses. Fermionic carriers
-would additionally require graded composition, parity admissibility, and
-measurement data capable of representing the target probabilities exactly.
+rational probability tables for its constructive witnesses. The [six-mode fermionic reference](fermion-reference.md) implements the specified
+graded route action, parity-preserving measurements, and exact algebraic output
+probabilities. Its comparison receipt addresses equality with a fixed strategy.

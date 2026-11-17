@@ -9,7 +9,7 @@ import platform
 import sys
 
 from .analysis import (certify_nonsignalling, classical_value, nonsignalling_value,
-                       npa_bound, xor_quantum_value, certify_xor_upper_bound)
+                       npa_bound, xor_quantum_value, certify_xor_upper_bound, certify_xor_lower_bound)
 from .core.serialization import load
 from .core.scalar_wire import scalar_string
 from .games import GAMES
@@ -65,7 +65,8 @@ def main(argv=None):
                                      epilog="Subcommands: task, network, claim, property, xor3, wiring, weighted-chsh. Use COMMAND --help for options.")
     parser.add_argument("game", choices=tuple(GAMES) + ("json",))
     parser.add_argument("--file", help="versioned verifier JSON, required for game=json")
-    parser.add_argument("--method", choices=("local", "ns", "ns-exact", "npa1", "npa1ab", "xor", "xor-certified"),
+    parser.add_argument("--method", choices=("local", "ns", "ns-exact", "npa1", "npa1ab", "xor", "xor-certified",
+                                             "xor-lower-certified"),
                         default="local")
     parser.add_argument("--solver", default="SCS", help="CVXPY solver for SDP methods")
     parser.add_argument("--tolerance", type=float, default=1e-7, help="SCS eps (only SCS)")
@@ -93,6 +94,8 @@ def main(argv=None):
             result = xor_quantum_value(game, **options)
         elif args.method == "xor-certified":
             result = certify_xor_upper_bound(game, **options)
+        elif args.method == "xor-lower-certified":
+            result = certify_xor_lower_bound(game, **options)
         else:
             result = npa_bound(game, level="1" if args.method == "npa1" else "1+AB", **options)
     except (OSError, TypeError, ValueError, NotImplementedError, RuntimeError, SolverError) as error:

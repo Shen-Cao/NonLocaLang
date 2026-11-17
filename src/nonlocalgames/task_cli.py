@@ -5,7 +5,7 @@ import math
 
 from .core.resource_serialization import load_task, resource_to_dict
 
-CLI_METHODS = ("local", "ns", "ns_exact", "npa", "xor", "xor_certified", "seesaw")
+CLI_METHODS = ("local", "ns", "ns_exact", "npa", "xor", "xor_certified", "xor_lower_certified", "seesaw")
 API_ONLY = {"state_sdp": "Requires supplied measurement operators; use AnalysisTask.solve in Python."}
 
 
@@ -77,7 +77,7 @@ def main(argv=None):
                   "environment": environment(), "requested_options": {}}
         if not args.capabilities:
             options = {}
-            if args.method in ("npa", "xor", "xor_certified"):
+            if args.method in ("npa", "xor", "xor_certified", "xor_lower_certified"):
                 options["solver"] = args.solver
                 if args.solver.upper() == "SCS":
                     options["eps"] = args.tolerance

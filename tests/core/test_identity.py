@@ -5,10 +5,12 @@ import json
 
 import numpy as np
 
-from nonlocalgames import Game, ResourceSpec
+from nonlocalgames import AnalysisTask, Game, ResourceSpec
+from nonlocalgames.claims import ValueClaim, assess_value
 from nonlocalgames.core.identity import resource_id, verifier_digest, verifier_id
 from nonlocalgames.core.numeric_data import matrix_from_dict
-from nonlocalgames.games import chsh
+from nonlocalgames.core.resource_serialization import resource_from_dict, resource_to_dict
+from nonlocalgames.games import chsh, ghz
 from nonlocalgames.quantum import FixedState
 
 
@@ -33,3 +35,16 @@ def test_resource_identity_keeps_restrictions_and_numeric_zero_representation():
     assert resource_id(ResourceSpec('quantum_finite', fixed_state=a)) != resource_id(ResourceSpec('quantum_finite', fixed_state=b))
     decoded = matrix_from_dict({'real': negative.real.tolist(), 'imag': negative.imag.tolist()}, 2)
     assert decoded.tobytes() == negative.tobytes()
+
+
+def test_ppt_party_labels_without_dimensions_roundtrip_with_same_identity_and_cut_order():
+    cuts = ((2, 0), (2,))
+    standard = ResourceSpec('quantum_finite', state_constraint='ppt', ppt_cuts=cuts)
+    numpy_cuts = tuple(tuple(np.int64(i) for i in cut) for cut in cuts)
+    resource = ResourceSpec('quantum_finite', state_constraint='ppt', ppt_cuts=numpy_cuts)
+    data = json.loads(json.dumps(resource_to_dict(resource)))
+    assert data['ppt_cuts'] == [[2, 0], [2]]
+    assert resource_id(resource_from_dict(data)) == resource_id(standard) == resource_id(resource)
+    task = AnalysisTask(ghz(), resource)
+    assessment = assess_value(task.game, ValueClaim(task.resource, 'at_least', 0))
+    assert assessment.execution == 'unsupported' and assessment.truth == 'unknown'

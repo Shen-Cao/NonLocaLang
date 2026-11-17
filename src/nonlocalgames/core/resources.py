@@ -87,6 +87,7 @@ class ResourceSpec:
                 raise ValueError("PPT cuts need nonnegative integer party indices")
             if len(set(cut)) != len(cut):
                 raise ValueError("Repeated party in PPT cut")
+        cuts = tuple(tuple(int(i) for i in cut) for cut in cuts)
         object.__setattr__(self, "ppt_cuts", cuts)
         if self.fixed_state is not None:
             from ..quantum.states import FixedState, product_state_residual

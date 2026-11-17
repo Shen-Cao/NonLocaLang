@@ -7,9 +7,7 @@ from .result import AnalysisResult
 from ..certificates.xor_model import xor_coefficients
 
 
-def _solve_xor(game, *, solver=None, max_matrix_size=1000, **solver_options):
-    """Return the numerical result and diagonal-equality dual for certificate discovery."""
-    import cvxpy as cp
+def _numeric_coefficients(game, max_matrix_size):
     import numpy as np
     constant, exact_weights = xor_coefficients(game, max_matrix_size=max_matrix_size)
     try:
@@ -23,14 +21,32 @@ def _solve_xor(game, *, solver=None, max_matrix_size=1000, **solver_options):
             for exact_row, numeric_row in zip(exact_weights, weights)
             for q, value in zip(exact_row, numeric_row)):
         raise ValueError("XOR coefficients underflow float64; rescale the game or supply an exact dual")
-    m, n = game.scenario.input_sizes
+    return offset, weights
+
+
+def _gram_problem(input_sizes, offset, weights):
+    import cvxpy as cp
+    m, n = input_sizes
     gram = cp.Variable((m + n, m + n), symmetric=True)
     constraints = [gram >> 0, cp.diag(gram) == 1]
     problem = cp.Problem(cp.Maximize(offset + cp.sum(cp.multiply(weights, gram[:m, m:]))), constraints)
+    return problem, gram, constraints
+
+
+def _solve_problem(problem, gram, constraints, solver, solver_options):
     value, witness, diagnostics = solve_sdp(problem, gram, constraints, solver, solver_options)
     diagnostics["mathematical_program"] = "exact characterization of unrestricted bipartite XOR quantum value"
-    result = AnalysisResult(value, "quantum_tensor_unbounded_dimension", "xor_vector_sdp",
-                            "numerical_optimum", problem.status, diagnostics, witness)
+    diagnostics["compilation_time"] = problem.compilation_time
+    return AnalysisResult(value, "quantum_tensor_unbounded_dimension", "xor_vector_sdp",
+                          "numerical_optimum", problem.status, diagnostics, witness)
+
+
+def _solve_xor(game, *, solver=None, max_matrix_size=1000, **solver_options):
+    """Return the numerical result and diagonal-equality dual for certificate discovery."""
+    import numpy as np
+    offset, weights = _numeric_coefficients(game, max_matrix_size)
+    problem, gram, constraints = _gram_problem(game.scenario.input_sizes, offset, weights)
+    result = _solve_problem(problem, gram, constraints, solver, solver_options)
     raw_dual = constraints[1].dual_value
     dual = None if raw_dual is None else np.asarray(raw_dual, dtype=float).reshape(-1)
     return result, dual

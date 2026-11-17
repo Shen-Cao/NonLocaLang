@@ -3,6 +3,7 @@ from ..core.resources import Resource, ResourceSpec
 from .types import DimensionInterval
 
 _DETERMINISTIC_CHECKERS = ('deterministic_score.v1', 'local_enumeration_replay.v1')
+_FINITE_ATTAINMENT_CHECKERS = ('rational_quantum_strategy.v1', 'rational_xor_primal_clifford.v1')
 
 
 def dimension_only(resource):
@@ -17,7 +18,7 @@ def _attainment_rule(check, caps):
     if check.resource == Resource.LOCAL and check.checker in _DETERMINISTIC_CHECKERS:
         return 'deterministic_embedding_dimension_one.v1'
     actual = check.actual_dimensions
-    if (check.resource == Resource.QUANTUM_FINITE and check.checker == 'rational_quantum_strategy.v1'
+    if (check.resource == Resource.QUANTUM_FINITE and check.checker in _FINITE_ATTAINMENT_CHECKERS
             and actual is not None and len(actual) == len(caps)
             and all(d <= cap for d, cap in zip(actual, caps))):
         return 'finite_witness_dimension_fit.v1'

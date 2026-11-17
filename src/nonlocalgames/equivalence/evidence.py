@@ -62,23 +62,31 @@ def _quantum_payload(game, target, artifact, relabelling, budget):
 
 def _xor_payload(target, artifact, relabelling, budget):
     from ..certificates.xor import verify_xor_dual
-    diagonal = tuple(parse_rational(value, max_bits=budget.max_wire_scalar_bits,
-                                    max_chars=budget.max_wire_scalar_chars)
-                     for value in artifact.payload['diagonal'])
+    from ..certificates.xor_primal import verify_xor_gram
     offsets = (0, relabelling.source.input_sizes[0])
-    transported = tuple(diagonal[offsets[old]+question]
-                        for old, questions in zip(relabelling.party_permutation, relabelling.input_maps)
-                        for question in questions)
-    return verify_xor_dual(target, transported, max_matrix_size=budget.max_matrix_size,
-                           max_scalar_bits=budget.max_wire_scalar_bits,
-                           max_scalar_chars=budget.max_wire_scalar_chars).witness
+    # A new answer 0 mapped to old answer 1 negates its dichotomic observable.
+    nodes = tuple((offsets[old_party]+old_question, 1-2*answer_map[0])
+                  for old_party, questions, answers in zip(relabelling.party_permutation,
+                                                           relabelling.input_maps, relabelling.output_maps)
+                  for old_question, answer_map in zip(questions, answers))
+    limits = dict(max_matrix_size=budget.max_matrix_size, max_scalar_bits=budget.max_wire_scalar_bits,
+                  max_scalar_chars=budget.max_wire_scalar_chars)
+    if artifact.kind == EvidenceKind.XOR_DUAL:
+        diagonal = artifact.payload['diagonal']
+        return verify_xor_dual(target, tuple(diagonal[i] for i, _ in nodes), **limits).witness
+    gram = tuple(tuple(parse_rational(value, max_bits=budget.max_wire_scalar_bits,
+                                      max_chars=budget.max_wire_scalar_chars, canonical=True)
+                       for value in row) for row in artifact.payload['gram'])
+    transported = tuple(tuple(gram[i][j] if sign_i == sign_j else -gram[i][j]
+                              for j, sign_j in nodes) for i, sign_i in nodes)
+    return verify_xor_gram(target, transported, **limits).witness
 
 
 def relabel_evidence(game, artifact, relabelling, *, budget=None, max_entries=1_000_000):
     """Recheck a source, construct its transported witness, then recheck a new artifact.
 
     Local enumeration is explicitly replayed on both verifiers. No optimizer is
-    called for deterministic, exact quantum, or XOR-dual transport. NS equality
+    called for deterministic, exact quantum, or XOR primal/dual transport. NS equality
     duals and opaque numerical hints are unsupported; no fingerprint-only rewrite
     or generic proof-receipt inference is performed.
     """
@@ -90,7 +98,7 @@ def relabel_evidence(game, artifact, relabelling, *, budget=None, max_entries=1_
     if not isinstance(budget, VerificationBudget):
         raise TypeError('Expected VerificationBudget')
     supported = {EvidenceKind.LOCAL_STRATEGY, EvidenceKind.LOCAL_ENUMERATION,
-                 EvidenceKind.QUANTUM_STRATEGY, EvidenceKind.XOR_DUAL}
+                 EvidenceKind.QUANTUM_STRATEGY, EvidenceKind.XOR_DUAL, EvidenceKind.XOR_PRIMAL}
     if artifact.kind not in supported:
         raise NotImplementedError(f'Raw {artifact.kind.value} evidence transport is unsupported')
     if not isinstance(game, Game):

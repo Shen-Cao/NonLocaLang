@@ -18,6 +18,7 @@ class EvidenceKind(StrEnum):
     LOCAL_ENUMERATION = "local_enumeration"
     NONSIGNALLING_LP = "nonsignalling_lp"
     XOR_DUAL = "xor_dual"
+    XOR_PRIMAL = "xor_primal"
     NUMERICAL_HINT = "numerical_hint"
     QUANTUM_STRATEGY = "quantum_strategy"
 

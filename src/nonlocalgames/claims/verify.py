@@ -115,6 +115,18 @@ def verify_artifact(game, artifact, *, budget=None):
                 raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, str(error), identifier) from error
             return EvidenceCheck(identifier, resource.kind, result.value, None, 'rational_quantum_strategy.v1',
                                  attained_score=result.value, actual_dimensions=tuple(result.diagnostics['actual_local_dimensions']))
+        if artifact.kind == EvidenceKind.XOR_PRIMAL:
+            if resource.kind != Resource.QUANTUM_FINITE:
+                raise EvidenceError(ExecutionStatus.UNSUPPORTED,
+                                    'XOR primal certificates require the finite tensor-product model', identifier)
+            if sum(game.scenario.input_sizes) > budget.max_matrix_size:
+                raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'XOR verification exceeds max_matrix_size', identifier)
+            from ..certificates.xor_primal import verify_xor_primal_certificate
+            result = verify_xor_primal_certificate(
+                game, payload, max_matrix_size=budget.max_matrix_size,
+                max_scalar_bits=budget.max_wire_scalar_bits, max_scalar_chars=budget.max_wire_scalar_chars)
+            return EvidenceCheck(identifier, resource.kind, result.value, None, 'rational_xor_primal_clifford.v1',
+                                 attained_score=result.value, actual_dimensions=result.diagnostics['realization_dimensions'])
         if artifact.kind == EvidenceKind.XOR_DUAL:
             if resource.kind != Resource.QUANTUM_COMMUTING:
                 raise EvidenceError(ExecutionStatus.UNSUPPORTED, 'XOR duals use the standard commuting upper-bound source model', identifier)

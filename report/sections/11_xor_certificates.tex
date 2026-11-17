@@ -1,4 +1,4 @@
-\section{Exact upper certificates for XOR games}
+\section{Exact primal and dual certificates for XOR games}
 \label{sec:xorcertificates}
 
 For a bipartite binary-output parity score, let $e_{xy}$ and $o_{xy}$ be its
@@ -63,3 +63,41 @@ quantum realization. Serialized certificates bind to the canonical verifier
 and store rational diagonals and the claimed bound. Rechecking recomputes the
 matrix, positivity, and bound from the supplied game, independently of the
 original solver and its tolerances.
+
+\subsection{Attainment from rational Gram data}
+
+\begin{proposition}
+Let $G$ be a real rational positive semidefinite matrix with unit diagonal
+in party/question order and rank $r$. The score $c_0+\langle C,G\rangle$ is
+attained by a finite strategy of local dimensions $D=2^{\lfloor r/2\rfloor}$
+on each side for the bipartite XOR objective.
+\end{proposition}
+\begin{proof}
+Factor $G$ over the reals to obtain unit vectors $u_x,v_y$ in $\mathbb R^r$.
+For $k=\lfloor r/2\rfloor$, take the $2k$ Pauli strings with a prefix of $Z$'s,
+one $X$ or $Y$, and an identity suffix on $k$ qubits. For odd $r$ include
+$Z^{\otimes k}$, using the scalar identity when $r=1$. These Hermitian
+involutions $\Gamma_i$ anticommute pairwise and obey
+$\Tr(\Gamma_i\Gamma_j)/D=\delta_{ij}$. For a real unit vector $u$ the
+observable $A(u)=\sum_i u_i\Gamma_i$ squares to the identity. On a maximally
+entangled state of dimension $D$ per party, $A(u_x)$ and $A(v_y)^T$ have
+correlator $\Tr(A(u_x)A(v_y))/D=u_x\cdot v_y$. Substitution in the objective
+gives the stated score. This is a finite Clifford realization of the XOR
+vector correspondence \cite{cleve2004}.
+\end{proof}
+
+The checker verifies the Gram constraints, rank, and objective by rational
+arithmetic without constructing the real factors or the $D$-dimensional
+observables. The dimension is sufficient for this realization. It supplies
+a lower bound for dimension-capped value claims when both caps are at least
+$D$. A smaller cap leaves this certificate inconclusive.
+
+For discovery, symmetrize a numerical candidate, fix the diagonal to one,
+and round off-diagonal entries to rational grid points. If the resulting $R$
+fails exact PSD, let $M=\max_i\sum_{j\ne i}|R_{ij}|$. Then $M>1$ and
+$(1-t)R+tI$ is PSD at $t=1-1/M$ by diagonal dominance. Bounded bisection
+with exact feasibility checks can reduce $t$. Compute the achieved score on
+the final checked matrix. An input-dependent output flip changes the sign of
+its node vector, so relabelling transports $G$ by a signed permutation
+congruence. The same transformation on the diagonal dual variables only
+requires the underlying node permutation.

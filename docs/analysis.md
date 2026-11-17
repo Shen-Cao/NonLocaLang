@@ -99,6 +99,16 @@ positive-probability input. Unused questions remain in the Gram model, but their
 zero-weight reward entries need not satisfy parity symmetry. Its witness is a Gram matrix, not an extracted
 state and collection of POVMs.
 
+`certify_xor_lower_bound` rounds a numerical Gram matrix to rational entries,
+mixes it with the identity as needed, and verifies exact PSD and unit diagonal.
+`verify_xor_primal_certificate` replays its score without solving an SDP. The
+finite Clifford construction gives sufficient local dimensions from the checked
+rank. Scalar and matrix-size budgets apply to the supplied Gram data. The
+checker computes that dimension symbolically and allocates no Clifford matrices.
+Use `--method xor-lower-certified --witness` from the game CLI or
+`xor_lower_certified` on an unrestricted bipartite XOR task. See the
+[weighted three-question examples](diagonal-xor3.md) for exact matching bounds.
+
 ### Explicit quantum witnesses and symbolic CHSH
 
 `QuantumStrategy(state, measurements, tolerance=1e-9)` accepts a density matrix and

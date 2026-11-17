@@ -63,7 +63,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Local optimizer | Any party count; bounded enumeration | Exact optimum and deterministic witness |
 | Nonsignalling LP | Any party count, including promised questions | Numerical solve; optional exact rational primal/dual certification |
 | NPA `1`, `1+AB` | Bipartite, arbitrary finite alphabets | Numerical outer-relaxation optimum |
-| XOR SDP and certificate | Bipartite binary outputs, parity-only sampled rewards | Numerical optimum; independently verified rational dual upper bounds |
+| XOR SDP and certificate | Bipartite binary outputs, parity-only sampled rewards | Numerical screening, exact rational Gram lower witnesses and dual upper bounds |
 | Quantum strategy evaluator | Finite tensor-product state and POVMs | Numerically validated witness and score |
 | Restricted quantum search | Multipartite dimensions, fixed/PPT states; POVMs or binary projectors | Seeded heuristic; restrictions rechecked on witnesses |
 | Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |
@@ -73,6 +73,9 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | No-input bilocal reconstruction | Arbitrary finite output alphabets on a three-party chain | Exact membership decision and constructive source model |
 | Exact quantum lower witnesses | Rational complex finite states/POVMs and explicit numerical repair | Independently checked feasible scores and proved strict gaps |
 | CHSH symbolic checker | Canonical CHSH involution algebra | Exact SOS bound and attaining realization |
+
+The [weighted three-question XOR family](docs/diagonal-xor3.md) exercises matching
+primal and dual certificates and the transition to strict quantum advantage.
 
 The benchmark library includes CHSH, GHZ, magic square, and GYNI. No generic
 self-testing decision procedure is claimed. An optimum value or an apparently

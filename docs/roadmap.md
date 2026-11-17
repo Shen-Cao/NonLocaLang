@@ -26,7 +26,10 @@ raw representative evidence. The [protocol checkpoint](wiring.md) supplies a
 bounded hidden-wiring arena, constructive classical witnesses, and an exact
 cross-route marginal test. The first [M3 discovery run](weighted-chsh.md)
 links numerical screening, rational witnesses, exact verdicts, and persistent
-progress on the weighted CHSH grid.
+progress on the weighted CHSH grid. Exact replay is profiled using the
+[reproducible workload](development.md#comparing-replay-cost). A
+[weighted three-question family](diagonal-xor3.md) exercises rank-based
+finite quantum attainment and matching rational upper certificates.
 
 The [dimension-bounded threshold rule](claims.md#dimension-bounded-thresholds) uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target

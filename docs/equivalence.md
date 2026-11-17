@@ -77,6 +77,7 @@ the receipt records provenance and cannot establish a claim by itself.
 | `local_strategy` | Rename response tables and recompute the attained score |
 | `local_enumeration` | Rename the maximizing tables and independently replay enumeration on both games |
 | `quantum_strategy` | Permute exact state factors and POVMs, then verify a fresh Born-score certificate |
+| `xor_primal` | Apply signed party/question permutation to both Gram axes and recheck attained score |
 | `xor_dual` | Permute party/question diagonal entries and recheck exact PSD on the target |
 | `nonsignalling_lp`, `numerical_hint` | Explicitly unsupported |
 

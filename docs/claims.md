@@ -55,6 +55,7 @@ artifact. Hashes establish content identity, not mathematical truth or authorshi
 | `local_enumeration` | Standard local | `strategy`, exact `value` string | Lower and upper after independent exhaustive replay |
 | `nonsignalling_lp` | Standard nonsignalling | Rational-string `primal` and `dual` arrays | Exact NS lower/upper feasibility bounds |
 | `xor_dual` | Standard commuting quantum | Existing fingerprinted XOR dual certificate | Exact commuting upper bound, also applicable downward |
+| `xor_primal` | Standard finite quantum | Fingerprinted rational unit-diagonal Gram matrix and achieved score | Exact finite Clifford realization with explicit sufficient local dimensions |
 | `quantum_strategy` | Standard finite tensor quantum | Full rational quantum lower certificate | Exact achieved quantum lower score |
 | `numerical_hint` | Recorded source context | JSON observation object | No certified bounds, regardless of asserted labels |
 

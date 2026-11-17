@@ -90,6 +90,28 @@ class WiringArena:
         return party, question, incoming[0]
 
 
+def _aligned_behaviors(arena, by_route, behavior_type):
+    if not isinstance(arena, WiringArena):
+        raise TypeError("Expected a WiringArena")
+    if not isinstance(by_route, Mapping):
+        raise TypeError("Provide behaviors keyed by route")
+    if len(by_route) != len(arena.routes):
+        raise ValueError("Provide one behavior for every route")
+    branches = {}
+    for key, behavior in by_route.items():
+        if not isinstance(key, tuple):
+            raise TypeError("Branch keys must be sender tuples")
+        route = _route(key, arena.scenario.parties)
+        if not isinstance(behavior, behavior_type):
+            raise TypeError(f"Expected a {behavior_type.__name__} per route")
+        if behavior.scenario != arena.scenario:
+            raise ValueError("Branch behavior differs from the arena scenario")
+        branches[route] = behavior
+    if branches.keys() != set(arena.routes):
+        raise ValueError("Target routes do not match its arena")
+    return tuple(branches[r] for r in arena.routes)
+
+
 @dataclass(frozen=True, init=False)
 class WiringTarget:
     """One exactly normalized nonsignalling behavior bound to each hidden route."""
@@ -97,23 +119,6 @@ class WiringTarget:
     behaviors: tuple[RationalBehavior, ...]
 
     def __init__(self, arena, by_route):
-        if not isinstance(arena, WiringArena):
-            raise TypeError("Expected a WiringArena")
-        if not isinstance(by_route, Mapping):
-            raise TypeError("Provide behaviors keyed by route")
-        if len(by_route) != len(arena.routes):
-            raise ValueError("Provide one behavior for every route")
-        branches = {}
-        for key, behavior in by_route.items():
-            if not isinstance(key, tuple):
-                raise TypeError("Branch keys must be sender tuples")
-            route = _route(key, arena.scenario.parties)
-            if not isinstance(behavior, RationalBehavior):
-                raise TypeError("Expected a RationalBehavior per route")
-            if behavior.scenario != arena.scenario:
-                raise ValueError("Branch behavior differs from the arena scenario")
-            branches[route] = behavior
-        if branches.keys() != set(arena.routes):
-            raise ValueError("Target routes do not match its arena")
+        behaviors = _aligned_behaviors(arena, by_route, RationalBehavior)
         object.__setattr__(self, "arena", arena)
-        object.__setattr__(self, "behaviors", tuple(branches[r] for r in arena.routes))
+        object.__setattr__(self, "behaviors", behaviors)

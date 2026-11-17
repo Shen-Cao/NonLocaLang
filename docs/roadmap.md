@@ -24,7 +24,9 @@ and [checked relabellings](equivalence.md) support the
 [uniform XOR corpus](xor3.md). Its 512 member-specific gap claims replay from
 raw representative evidence. The [protocol checkpoint](wiring.md) supplies a
 bounded hidden-wiring arena, constructive classical witnesses, and an exact
-cross-route marginal test. M3 starts with a resumable weighted CHSH experiment.
+cross-route marginal test. The first [M3 discovery run](weighted-chsh.md)
+links numerical screening, rational witnesses, exact verdicts, and persistent
+progress on the weighted CHSH grid.
 
 The first restricted claim rule for M3 uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target

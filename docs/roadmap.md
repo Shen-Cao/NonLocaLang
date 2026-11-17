@@ -10,9 +10,10 @@ to preventing an incorrect mathematical claim.
 | M0: claim and evidence semantics | Typed claims, bound directions, exact identities, verification admission, and distinct operational outcomes | External result labels cannot prove a claim; evidence is rechecked in its full context; failures are not mathematical falsehoods |
 | M1: positive quantum certificates | Exact finite-dimensional state/POVM witnesses and independently checked lower scores | Strict quantum/classical separations can be proved; numerical repairs do not silently preserve fixed-state, projective, PPT, or network assumptions |
 | M2: properties and transport | A narrow property layer, checked inference rules, and exact local-relabel transport | Structural properties and threshold claims have precise definitions; transported evidence preserves verifier and resource assumptions |
-| M3: discovery loop | Bounded family specifications, enumeration, deduplication, screening, search, and verified claims | A run can be resumed with the same parameters, seeds, assumptions, and unresolved cases |
+| Protocol semantics checkpoint | A family of prepare–route–measure experiments sharing one local strategy | Locally identical views impose identical responses across hidden wirings, including when a sent port returns to its original owner |
+| M3: discovery loop | Bounded family specifications, enumeration, deduplication, screening, search, and verified claims | Restarting after interruption recovers the same coverage, checked verdicts, unresolved cases, and raw evidence. Run records bind the revision, family, resources, seeds, options and budgets |
 | M4: reusable execution and ledger | Compiled-template caching, batch execution, budgets, and searchable evidence records | Measured reuse, isolated solver state, and recheckable provenance for every claimed result |
-| M5: targeted scientific coverage | One structured family and one backend adapter justified by an experiment | Independent cross-checks and a verified translation back to the original mathematical task |
+| M5: targeted scientific coverage | A scientific extension selected from measured needs of a structured family | Independent cross-checks and a verified translation back to the original mathematical task |
 | M6: optional agent transport | A thin MCP or other transport adapter over the stable public operations | No duplicated mathematical logic, hidden solver fallback, or weakening of resource restrictions |
 
 The M0 claim/evidence fragment is implemented for the standard unrestricted
@@ -24,10 +25,12 @@ representatives remain the next stage:
 
 | Stage | Deliverable | Acceptance gate |
 |---|---|---|
-| M2c: canonical XOR corpus | Complete canonicalization of uniform bipartite 3×3 XOR predicates, with an explicit transporter | All 512 predicates form exactly three orbits; budget exhaustion never produces a canonical identity |
+| M2c: canonical XOR corpus | Complete canonicalization of uniform bipartite 3×3 XOR predicates, with an explicit transporter | All 512 distinct verifiers have a checked transporter to one of three representatives. Raw evidence replay proves 480 strict quantum gaps and disproves 32. Incomplete searches issue no canonical ID |
 
-Dimension/PPT classical-value reductions
-remain useful theorem-backed inference rules for M2. Broader NPA, quantum inflation,
+The first restricted claim rule for M3 uses an attained finite-dimensional score
+when the verified witness fits every dimension bound and satisfies all other target
+restrictions. Value reductions for product or particular PPT contracts need
+separate proofs. Broader NPA, quantum inflation,
 and trusted/sequential interfaces are selected when a discovery experiment requires
 them; their existence is not itself a reason to expand the dependency set.
 
@@ -68,12 +71,38 @@ search or a convenient invariant is not an exact canonical representative.
 Template caches include compiler/schema conventions. Result caches additionally
 include resource, method/level, numerical options, seed, and code provenance.
 
+## Protocol semantics checkpoint
+
+One witness supplies independent preparations before a hidden route is chosen and
+operations indexed by the local information available after routing. Port identities
+persist across routes, including a port that returns to its sender. The family ID
+binds the routes, local views, timing, and preparation assumptions. A transcript
+from one fixed route can be evaluated independently. Joint compatibility requires
+the same admissible strategy across the entire family.
+
+The first test uses singleton questions. In both cycles ABC and AC, Alice keeps
+her own port and receives Charlie’s. With independent preparations, her marginal
+must agree across these routes. A target requiring opposite deterministic outputs
+at Alice in the two routes is individually feasible in each branch and jointly
+impossible. A shared deterministic response gives a positive control. This
+rational experiment isolates the information constraint in the
+[fermionic rewiring experiment](https://arxiv.org/abs/2606.12363v1).
+Exact graded routing and algebraic measurements are a subsequent research
+extension. The full experiment asks for joint behavior compatibility.
+
 ## Discovery acceptance experiments
 
 Start with exhaustive uniform three-input-per-party bipartite XOR predicates:
 there are 512 raw predicates and three orbits under local input permutations,
 input-dependent output flips, and party exchange. This is a deterministic
 correctness corpus for equivalence and transport, not a claim of new games.
+
+Replay each member against its exact verifier ID. Orbit sizes are 32, 288, and
+192 in lexicographic representative order. The all-zero representative admits
+perfect local play. Both other representatives have certified quantum advantages.
+Archive raw evidence with sufficient information for fresh-process replay. For a
+weighted control, biased CHSH with input-11 weight 1/10 has exact local and
+quantum value 9/10, making it a regression for screening near zero gap.
 
 A larger discovery corpus must specify its family, rational parameter domain,
 score normalization, sampling, and equivalence convention. General Boolean

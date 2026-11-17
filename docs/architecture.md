@@ -92,16 +92,4 @@ unsupported. Users explicitly request NPA outer relaxations, an XOR-specific SDP
 or finite-dimensional strategy evidence. Dimension-constrained searches, fixed-state/PPT restrictions, and source networks
 are selected through ResourceSpec; they cannot be inferred from a generic Bell functional.
 
-## Next implementation gates
-
-1. Add independent cross-checks against toqito/ncpol2sdpa on randomized small games.
-2. Extend the verified rational LP and symbolic CHSH certificate paths to SDP
-   dual certificates. Numerical bounds need independent rigorous verification.
-3. Add sparse/factorized rule IR, symmetry actions, and reduction proof records;
-   benchmark build time separately from solve time and certificate verification.
-4. Extend the implemented source-incidence witnesses, exact compatibility
-   fragments, and classical spiral inflation with higher-order/quantum inflation
-   and causal protocols. Shared global randomness must
-   not erase source independence.
-5. Add target equivalence, extraction channels, and robustness certificates before
-   exposing a self-testing claim API. Optimizer uniqueness is insufficient.
+The [discovery roadmap](roadmap.md) defines the milestone order and acceptance experiments.

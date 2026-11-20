@@ -1,15 +1,19 @@
 from collections import Counter
+from contextlib import contextmanager
 from dataclasses import replace
 from fractions import Fraction
 from hashlib import sha256
 import json
+import os
+from pathlib import Path
 import shutil
 from types import SimpleNamespace
 
 import pytest
 
-from nonlocalgames.claims import VerificationBudget
-from nonlocalgames.claims.types import EvidenceError, ExecutionStatus, TruthStatus
+from nonlocalgames.claims import VerificationBudget, assessment_to_dict, evidence_from_dict
+from nonlocalgames.claims.serialization import assessment_from_dict
+from nonlocalgames.claims.types import ClaimAssessment, ClaimIssue, EvidenceError, ExecutionStatus, TruthStatus
 from nonlocalgames.core.identity import canonical_json
 from nonlocalgames.core.scalar_wire import parse_rational
 from nonlocalgames.discovery import _weighted_record as records
@@ -166,16 +170,17 @@ def test_pure_join_preserves_conflicts_support_and_unknowns():
 
 def test_pure_join_requires_a_distinct_completed_origin_for_each_fact():
     observation, fact = _synthetic('a', TruthStatus.UNKNOWN)
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match='completed replay'):
         replace(fact, execution=ExecutionStatus.BUDGET_EXCEEDED)
-    with pytest.raises(ValueError):
-        join_occurrences((), (fact,))
-    with pytest.raises(ValueError):
-        join_occurrences((replace(observation, replay_execution=None),), (fact,))
-    with pytest.raises(ValueError):
-        join_occurrences((observation, observation), (fact,))
-    with pytest.raises(ValueError):
-        join_occurrences((observation,), (fact, fact))
+    for occurrences, facts, message in (
+        ((), (fact,), 'matching replayed occurrence'),
+        ((replace(observation, replay_execution=None),), (fact,), 'matching replayed occurrence'),
+        ((observation, observation), (fact,), 'Duplicate occurrence'),
+        ((observation,), (fact, fact), 'Duplicate fact'),
+    ):
+        with pytest.raises(ValueError, match=message) as caught:
+            join_occurrences(occurrences, facts)
+        assert str(fact.origin) in str(caught.value)
 
 
 def test_equal_parameters_do_not_merge_distinct_claims_or_hide_provenance_conflicts():
@@ -291,7 +296,7 @@ def test_rejects_rehashed_member_with_wrong_binding_without_replay(archives, tmp
     _rewrite_member(member, lambda r: r.update(update))
     with pytest.raises(EvidenceError) as caught:
         load_ledger([archive], replay=False)
-    assert run_id in str(caught.value) and 'k=1' in str(caught.value)
+    assert all(s in str(caught.value) for s in (run_id, 'k=1', _read(member)['member_id']))
 
 
 @pytest.mark.parametrize('damage', ['stale_member_id', 'nonfinite_candidate'])
@@ -312,17 +317,24 @@ def test_corrupt_members_fail_even_without_replay(archives, tmp_path, damage):
 @pytest.mark.parametrize('entry', ['manifest.json', 'members/0.json', 'members', '.'])
 def test_refuses_symlinked_checkpoints_and_archive_directories(archives, tmp_path, entry):
     path = shutil.copytree(archives[0], tmp_path / 'archive')
+    run_id = _read(path / 'manifest.json')['run_id']
     original = path / entry if entry != '.' else path
     target = tmp_path / 'link-target'
     original.rename(target)
     _link(original, target, directory=target.is_dir())
-    with pytest.raises(EvidenceError):
+    with pytest.raises(EvidenceError) as caught:
         load_ledger([path], replay=False)
+    message = str(caught.value)
+    if entry.startswith('members'):
+        assert run_id in message and ('members' if entry == 'members' else 'k=0') in message
+    else:
+        assert str(path) in message and ('symlink' if entry == '.' else 'manifest.json') in message
+    assert caught.value.__cause__ is not None
 
 
 def test_rejects_parent_traversal_in_archive_input(archives):
     fine, coarse = archives
-    with pytest.raises(EvidenceError):
+    with pytest.raises(EvidenceError, match='Parent traversal'):
         load_ledger([coarse / '..' / fine.name], replay=False)
 
 
@@ -333,18 +345,19 @@ def _link(path, target, *, directory=False):
         pytest.skip(f'Symlinks unavailable: {error}')
 
 
-def test_rejects_symlink_in_parent_of_archive_input(archives, tmp_path):
+@pytest.mark.parametrize('replay', [True, False])
+def test_permits_caller_selected_symlink_in_parent_of_archive_input(archives, tmp_path, replay):
     alias = tmp_path / 'alias'
     _link(alias, archives[0].parent, directory=True)
-    with pytest.raises(EvidenceError):
-        load_ledger([alias / archives[0].name], replay=False)
+    assert load_ledger(alias / archives[0].name, replay=replay) == load_ledger(archives[0], replay=replay)
 
 
 def test_dangling_members_directory_cannot_look_like_an_empty_prefix(archives, tmp_path):
     shutil.copyfile(archives[0] / 'manifest.json', tmp_path / 'manifest.json')
     _link(tmp_path / 'members', tmp_path / 'absent', directory=True)
-    with pytest.raises(EvidenceError):
+    with pytest.raises(EvidenceError, match='real directory') as caught:
         load_ledger([tmp_path], replay=False)
+    assert _read(tmp_path / 'manifest.json')['run_id'] in str(caught.value)
 
 
 @pytest.mark.parametrize('entry_type', ['directory', 'symlink'])
@@ -355,8 +368,9 @@ def test_scratch_name_cannot_hide_other_file_types(archives, tmp_path, entry_typ
         entry.mkdir()
     else:
         _link(entry, archive / 'members/0.json')
-    with pytest.raises(EvidenceError):
+    with pytest.raises(EvidenceError) as caught:
         load_ledger([archive], replay=False)
+    assert entry.name in str(caught.value) and _read(archive / 'manifest.json')['run_id'] in str(caught.value)
 
 
 @pytest.mark.parametrize('field', ['claim_id', 'game_id'])
@@ -472,3 +486,255 @@ def test_fixed_nonempty_ledger_has_exact_wire_record():
     }
     assert ledger_to_json(ledger).encode() == json.dumps(
         expected, sort_keys=True, separators=(',', ':'), allow_nan=False).encode()
+
+
+@pytest.mark.parametrize('replay', [True, False])
+@pytest.mark.parametrize('layout', ['missing', 'empty', 'symlink', 'file'])
+def test_import_requires_real_members_directory(archives, tmp_path, layout, replay):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    members = archive / 'members'
+    saved = members.rename(tmp_path / 'saved-members')
+    manifest = _read(archive / 'manifest.json')
+    if layout == 'empty':
+        members.mkdir()
+        ledger = load_ledger(archive, replay=replay)
+        run, = ledger.runs
+        assert run.run_id == manifest['run_id'] and run.member_count == 0 and not run.complete
+        assert run.missing_member_indices == tuple(range(manifest['steps'] + 1))
+        assert ledger.questions == ledger.occurrences == ledger.facts == ()
+        return
+    if layout == 'symlink':
+        _link(members, saved, directory=True)
+    elif layout == 'file':
+        members.touch()
+    with pytest.raises(EvidenceError, match='members') as caught:
+        load_ledger(archive, replay=replay)
+    assert manifest['run_id'] in str(caught.value) and caught.value.__cause__ is not None
+
+
+def test_selected_file_is_reported_as_a_file(archives):
+    path = archives[0] / 'manifest.json'
+    with pytest.raises(EvidenceError, match='archive is a file') as caught:
+        load_ledger(path)
+    assert str(path) in str(caught.value)
+
+
+@pytest.mark.parametrize('at_root', [True, False])
+def test_import_stops_at_first_extra_directory_entry(archives, tmp_path, monkeypatch, at_root):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    directory = archive if at_root else archive / 'members'
+    allowed = {p.name for p in directory.iterdir()}
+    for i in range(2048):
+        (directory / f'.nlg-checkpoint-{i}.tmp').touch()
+    real_scandir = os.scandir
+    yielded = []
+
+    @contextmanager
+    def counted(path):
+        with real_scandir(path) as entries:
+            def count_entries():
+                for entry in entries:
+                    yielded.append(entry.name)
+                    yield entry
+            yield count_entries() if path == directory else entries
+
+    monkeypatch.setattr(os, 'scandir', counted)
+    with pytest.raises(EvidenceError) as caught:
+        load_ledger(archive, replay=False)
+    assert 1 <= len(yielded) <= len(allowed) + 1
+    assert set(yielded[:-1]) <= allowed and yielded[-1] not in allowed
+    assert yielded[-1] in str(caught.value) and _read(archive / 'manifest.json')['run_id'] in str(caught.value)
+
+
+def test_stray_entry_is_not_attributed_to_a_missing_index(archives, tmp_path):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    (archive / 'members/1.json').unlink()
+    (archive / 'members/stray').touch()
+    with pytest.raises(EvidenceError, match='stray') as caught:
+        load_ledger(archive)
+    assert 'k=1' not in str(caught.value)
+
+
+def _assert_rejected_origin(path, replay, match=None):
+    member = _read(path)
+    with pytest.raises(EvidenceError, match=match) as caught:
+        load_ledger(path.parent.parent, replay=replay)
+    assert all(s in str(caught.value) for s in
+               (member['run_id'], f"k={member['k']}", member['member_id']))
+    assert caught.value.__cause__ is not None
+
+
+def _set_nested(record, path, value):
+    for field in path[:-1]:
+        record = record[field]
+    record[path[-1]] = value
+
+
+@pytest.mark.parametrize(('fields', 'value'), [
+    (('truth',), 'uncertain'), (('execution',), 'timeout'),
+    (('intervals',), {}), (('intervals', 0), {}), (('intervals', 0, 'resource'), 'foreign'),
+    (('intervals', 0, 'lower'), 1), (('intervals', 0, 'upper'), '2/2'),
+    (('intervals', 0, 'lower_refs'), None), (('intervals', 0, 'extra'), []),
+    (('checks',), None), (('checks', 0), []), (('checks', 0, 'extra'), None),
+    (('checks', 0, 'is_proof'), 1), (('checks', 0, 'checker'), {}), (('checks', 0, 'checker'), ''),
+    (('checks', 0, 'resource'), False), (('checks', 0, 'attained_score'), '1.00'),
+    (('checks', 0, 'lower'), 0.5), (('checks', 0, 'actual_dimensions'), '22'),
+    (('checks', 0, 'actual_dimensions'), [True]), (('checks', 0, 'is_proof'), False),
+    (('issues',), {}), (('issues',), [{'code': 'unknown', 'message': 'issue', 'evidence_id': None}]),
+    (('issues',), [{'code': 'invalid_evidence', 'message': 17, 'evidence_id': None}]),
+    (('issues',), [{'code': 'invalid_evidence', 'message': 'missing ID field'}]),
+    (('derivation',), [2]), (('verified_evidence',), 'artifact'), (('numerical_hints',), {}),
+])
+def test_fast_load_rejects_malformed_nested_receipt(archives, tmp_path, fields, value):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    member = archive / 'members/0.json'
+    _rewrite_member(member, lambda row: _set_nested(row['assessment'], fields, value))
+    _assert_rejected_origin(member, replay=False)
+
+
+@pytest.mark.parametrize('fields', [
+    ('verified_evidence', 0), ('numerical_hints', 0), ('checks', 0, 'artifact_id'),
+    ('intervals', 0, 'lower_refs', 0), ('intervals', 0, 'upper_refs', 0), ('issues', 0, 'evidence_id'),
+])
+def test_fast_load_binds_each_receipt_reference_to_its_member(archives, tmp_path, fields):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    member = archive / 'members/0.json'
+    foreign = _read(archive / 'members/1.json')['evidence'][0]['artifact_id']
+
+    def change(row):
+        receipt = row['assessment']
+        if fields[0] == 'numerical_hints':
+            receipt['numerical_hints'] = [foreign]
+        elif fields[0] == 'issues':
+            receipt['issues'] = [{'code': 'invalid_evidence', 'message': 'issue', 'evidence_id': foreign}]
+        else:
+            _set_nested(receipt, fields, foreign)
+
+    _rewrite_member(member, change)
+    _assert_rejected_origin(member, replay=False, match='evidence reference')
+
+
+def test_fast_load_rejects_envelope_from_another_verifier(archives, tmp_path):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    member = archive / 'members/0.json'
+    foreign = _read(archive / 'members/1.json')['evidence'][0]
+    _rewrite_member(member, lambda row: _set_nested(row, ('evidence', 0), foreign))
+    _assert_rejected_origin(member, replay=False, match='different game verifier')
+
+
+def test_replay_validates_archived_observation_before_calling_assess_gap(archives, tmp_path, monkeypatch):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    member = archive / 'members/0.json'
+    _rewrite_member(member, lambda row: row['assessment'].update(checks=None))
+    monkeypatch.setattr(records, 'assess_gap', lambda *a, **kw: pytest.fail('invalid receipt reached replay'))
+    _assert_rejected_origin(member, replay=True, match='checks must be a JSON array')
+
+
+def test_standard_receipt_round_trip_remains_an_observation(archives):
+    row = _read(archives[0] / 'members/1.json')
+    receipt = assessment_from_dict(row['assessment'], claim_id=row['claim_id'], game_id=row['verifier_id'],
+                                   artifacts=map(evidence_from_dict, row['evidence']))
+    assert isinstance(receipt.intervals[0].lower, Fraction)
+    assert assessment_to_dict(receipt) == row['assessment']
+    q = load_ledger(archives[0], replay=False).resolve(row['claim_id'])
+    assert q.occurrences[0].archived_truth == receipt.truth == 'proved'
+    assert q.status == 'unverified' and q.facts == ()
+
+
+@pytest.mark.parametrize('replay', [True, False])
+@pytest.mark.parametrize('generation_failure', [True, False])
+def test_rehashed_invalid_screen_candidate(archives, tmp_path, replay, generation_failure):
+    archive = shutil.copytree(archives[1], tmp_path / 'archive')
+    member = archive / 'members/0.json'
+
+    def change(row):
+        if generation_failure:
+            row.update(evidence=[], assessment=None, generation_error={'status': 'budget_exceeded', 'detail': 'saved'})
+            row['screen']['candidate_gap'] = 0.125
+        else:
+            row['screen']['candidate_gap'] = True
+
+    _rewrite_member(member, change)
+    _assert_rejected_origin(member, replay=replay, match='candidate gap')
+
+
+@pytest.mark.parametrize('source', ['generated', 'recorded'])
+def test_real_budget_outcomes_keep_each_issue_and_origin(archives, source):
+    archive = archives[0] if source == 'generated' else Path('output/chsh-grid-audit')
+    if source == 'recorded' and not archive.exists():
+        pytest.skip('Recorded grid audit is an optional local archive')
+    budget = VerificationBudget(max_strategies=1)
+    ledger = load_ledger(archive, budget=budget)
+    assert len(ledger.occurrences) == _read(archive / 'manifest.json')['steps'] + 1
+    assert len(ledger.questions) == ledger.summary['statuses']['unverified'] == len(ledger.occurrences)
+    assert ledger.facts == ()
+    for occurrence in ledger.occurrences:
+        member = _read(archive / 'members' / f'{occurrence.k}.json')
+        issue, = occurrence.replay_issues
+        assert occurrence.origin == (member['run_id'], member['member_id'])
+        assert occurrence.archived_truth == member['assessment']['truth']
+        assert occurrence.archived_execution == 'completed'
+        assert issue.code == occurrence.replay_execution == ExecutionStatus.BUDGET_EXCEEDED
+        assert issue.message == 'Classical replay exceeds max_strategies'
+        assert issue.evidence_id == member['evidence'][0]['artifact_id']
+        q = ledger.resolve(occurrence.claim_id)
+        assert q.facts == q.verified_evidence == ()
+        assert question_to_dict(q)['occurrences'][0]['replay_issues'] == [
+            {'code': 'budget_exceeded', 'message': issue.message, 'evidence_id': issue.evidence_id}]
+    manifest = _read(archive / 'manifest.json')
+    with pytest.raises(EvidenceError, match='^Replay budget exhausted at member 0$'):
+        records.verify_member(manifest, 0, _read(archive / 'members/0.json'), budget)
+
+
+@pytest.mark.parametrize('status', [s for s in ExecutionStatus if s not in (
+    ExecutionStatus.COMPLETED, ExecutionStatus.BUDGET_EXCEEDED)])
+def test_preserves_other_returned_execution_statuses(archives, monkeypatch, status):
+    def incomplete(game, claim, artifacts, *, budget):
+        issue = ClaimIssue(status, 'checker diagnostic', artifacts[0].artifact_id)
+        return ClaimAssessment(records.claim_id(game, claim), records.verifier_id(game),
+                               TruthStatus.UNKNOWN, status, issues=(issue,))
+    monkeypatch.setattr(records, 'assess_gap', incomplete)
+    ledger = load_ledger(archives[0])
+    assert ledger.facts == () and all(q.status == 'unverified' for q in ledger.questions)
+    assert all(o.replay_execution == status and o.replay_issues[0].code == status
+               for o in ledger.occurrences)
+    with pytest.raises(ValueError, match=f'^Archived member 0 has rejected evidence: {status.value}$'):
+        records.verify_member(_read(archives[0] / 'manifest.json'), 0,
+                              _read(archives[0] / 'members/0.json'), VerificationBudget())
+
+
+def test_error_raised_by_assess_gap_keeps_original_issue_and_chain(archives, monkeypatch):
+    row = _read(archives[0] / 'members/0.json')
+    exc = EvidenceError(ExecutionStatus.CHECKER_ERROR, 'checker raised', row['evidence'][0]['artifact_id'])
+    def raised(*args, **kwargs):
+        raise exc
+    monkeypatch.setattr(records, 'assess_gap', raised)
+    with pytest.raises(EvidenceError, match='checker raised') as caught:
+        load_ledger(archives[0])
+    assert caught.value.__cause__ is exc
+    assert caught.value.issue.evidence_id == exc.issue.evidence_id
+    assert caught.value.issue.code == exc.issue.code
+    assert all(x in str(caught.value) for x in (row['run_id'], 'k=0', row['member_id']))
+
+
+def test_direct_constructors_freeze_and_order_sequences(archives):
+    ledger = load_ledger(archives)
+    q = _at(ledger, Fraction(0))
+    fields = ('occurrences', 'facts', 'supporting_facts', 'conflicting_facts', 'verified_evidence',
+              'numerical_hints', 'coverage_runs', 'missing_runs')
+    restored = replace(q, **{f: list(reversed(getattr(q, f))) for f in fields})
+    assert restored == q and hash(restored) == hash(q)
+    reordered = replace(ledger, questions=ledger.questions[::-1], runs=list(reversed(ledger.runs)))
+    assert reordered == ledger and hash(reordered) == hash(ledger)
+    assert all(reordered.resolve(question.claim_id) == question for question in ledger.questions)
+
+
+def test_supplied_run_must_cover_its_occurrence(archives):
+    ledger = load_ledger(archives[0], replay=False)
+    run, = ledger.runs
+    empty = replace(run, member_count=0)
+    with pytest.raises(ValueError, match='outside recorded grid prefix') as caught:
+        join_occurrences(ledger.occurrences, (), (empty,))
+    assert run.run_id in str(caught.value)
+    with pytest.raises(ValueError, match='outside recorded grid prefix'):
+        replace(ledger, runs=(empty,))

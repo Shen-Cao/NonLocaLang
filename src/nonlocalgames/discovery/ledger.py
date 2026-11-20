@@ -13,14 +13,15 @@ from fractions import Fraction
 import json
 from math import isfinite
 from operator import attrgetter
+import os
 from os import PathLike
 from pathlib import Path
 
 from ..claims import evidence_from_dict
-from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus, TruthStatus, VerificationBudget
+from ..claims.types import ClaimIssue, EvidenceError, ExecutionStatus, TruthStatus, VerificationBudget
 from ..core.scalar_wire import parse_rational, scalar_string
 from . import _weighted_record
-from ._checkpoint import MANIFEST_BYTES, MEMBER_BYTES, load_checkpoint, prefix_size
+from ._checkpoint import MANIFEST_BYTES, MEMBER_BYTES, load_checkpoint
 from .run_manifest import replay_budget, validate_manifest
 
 __all__ = [
@@ -48,6 +49,12 @@ class RunArchive:
     schema: str
     steps: int
     member_count: int
+
+    def __post_init__(self):
+        if type(self.steps) is not int or self.steps < 1:
+            raise ValueError('A run must have a positive integer step count')
+        if type(self.member_count) is not int or not 0 <= self.member_count <= self.steps + 1:
+            raise ValueError('Member count must describe a prefix of the declared grid')
 
     @property
     def complete(self) -> bool:
@@ -79,6 +86,7 @@ class Occurrence(_MemberClaim):
 
     replay_execution is None when replay was skipped. A saved generation failure
     retains its execution status when reviewed and cannot produce a verified fact.
+    replay_issues preserves the verifier's returned diagnostics in their original order.
     """
 
     k: int
@@ -88,6 +96,7 @@ class Occurrence(_MemberClaim):
     screen_status: str
     candidate_gap: float | None
     replay_execution: ExecutionStatus | None = None
+    replay_issues: tuple[ClaimIssue, ...] = ()
 
     def __post_init__(self):
         if not isinstance(self.p, Fraction):
@@ -100,6 +109,10 @@ class Occurrence(_MemberClaim):
         object.__setattr__(self, 'archived_execution', ExecutionStatus(self.archived_execution))
         if self.replay_execution is not None:
             object.__setattr__(self, 'replay_execution', ExecutionStatus(self.replay_execution))
+        issues = tuple(self.replay_issues)
+        if any(not isinstance(issue, ClaimIssue) for issue in issues):
+            raise TypeError('Replay issues must be ClaimIssue records')
+        object.__setattr__(self, 'replay_issues', issues)
 
 
 @dataclass(frozen=True)
@@ -139,6 +152,8 @@ class QuestionRecord:
     Opposing decisive facts produce CONFLICT and both sides retain their origins.
     Incompatible verifier IDs also produce CONFLICT, with verifier_id set to None.
     verified_evidence cites only supporting facts. numerical_hints spans all facts.
+    Construction freezes sequences in canonical order. Direct callers must supply
+    the consistent status, support, conflict and coverage computed by the join.
     """
 
     claim_id: str
@@ -153,6 +168,31 @@ class QuestionRecord:
     numerical_hints: tuple[str, ...]
     coverage_runs: tuple[str, ...]
     missing_runs: tuple[str, ...]
+
+    def __post_init__(self):
+        object.__setattr__(self, 'status', QuestionStatus(self.status))
+        for field in ('occurrences', 'facts', 'supporting_facts', 'conflicting_facts'):
+            object.__setattr__(self, field, tuple(sorted(getattr(self, field), key=attrgetter('origin'))))
+        for field in ('verified_evidence', 'numerical_hints', 'coverage_runs', 'missing_runs'):
+            object.__setattr__(self, field, tuple(sorted(getattr(self, field))))
+
+
+def _runs_by_id(runs):
+    run_map = {}
+    for run in runs:
+        if run.run_id in run_map:
+            raise ValueError(f'Duplicate run_id {run.run_id}')
+        run_map[run.run_id] = run
+    return run_map
+
+
+def _check_grid_location(occurrence, runs):
+    run = runs.get(occurrence.run_id)
+    if run is None:
+        raise ValueError(f'Unknown occurrence run_id {occurrence.run_id}')
+    if (type(occurrence.k) is not int or not 0 <= occurrence.k < run.member_count
+            or occurrence.p * run.steps != occurrence.k):
+        raise ValueError(f'Occurrence outside recorded grid prefix at {occurrence.origin}, k={occurrence.k}')
 
 
 def _missing_runs(occurrences, covered, runs):
@@ -193,30 +233,27 @@ def _resolution(verifier_ids, facts):
 def join_occurrences(
     occurrences: Iterable[Occurrence], facts: Iterable[VerifiedFact], runs: Iterable[RunArchive] = (),
 ) -> tuple[QuestionRecord, ...]:
-    """Join by claim_id. Callers supply already replayed facts or use load_ledger.
+    """Join by claim_id. This pure operation trusts callers to supply genuinely
+    replayed facts. Use load_ledger to verify an archive's raw evidence.
 
     coverage_runs lists every observing run. missing_runs counts only supplied
     runs of the same weighted family whose grid schedules an observed parameter
     in their missing suffix. Empty prefixes count, off-grid parameters do not.
     Without run descriptors the join makes no missing-coverage inference.
     """
-    run_map = {}
-    for run in runs:
-        if run.run_id in run_map:
-            raise ValueError(f'Duplicate run_id {run.run_id}')
-        run_map[run.run_id] = run
+    run_map = _runs_by_id(runs)
 
     by_claim = defaultdict(dict)
-    for occurrence in sorted(occurrences, key=attrgetter('origin')):
+    for occurrence in occurrences:
         observed = by_claim[occurrence.claim_id]
         if occurrence.origin in observed:
             raise ValueError(f'Duplicate occurrence at {occurrence.origin}')
-        if run_map and occurrence.run_id not in run_map:
-            raise ValueError(f'Unknown occurrence run_id {occurrence.run_id}')
+        if run_map:
+            _check_grid_location(occurrence, run_map)
         observed[occurrence.origin] = occurrence
 
     claim_facts = defaultdict(dict)
-    for fact in sorted(facts, key=attrgetter('origin')):
+    for fact in facts:
         occurrence = by_claim.get(fact.claim_id, {}).get(fact.origin)
         if occurrence is None or occurrence.replay_execution != ExecutionStatus.COMPLETED:
             raise ValueError(f'Fact lacks a matching replayed occurrence at {fact.origin}')
@@ -246,12 +283,25 @@ def join_occurrences(
 
 @dataclass(frozen=True)
 class Ledger:
-    """An immutable cross-run snapshot of archived observations and replayed facts."""
+    """An immutable cross-run snapshot of archived observations and replayed facts.
+
+    Direct callers supply the questions from joining these occurrences, facts and runs.
+    Construction freezes all four sequences in the same canonical order as load_ledger.
+    """
 
     runs: tuple[RunArchive, ...]
     occurrences: tuple[Occurrence, ...]
     facts: tuple[VerifiedFact, ...]
     questions: tuple[QuestionRecord, ...]
+
+    def __post_init__(self):
+        for field, key in (('runs', 'run_id'), ('occurrences', 'origin'), ('facts', 'origin'),
+                           ('questions', 'claim_id')):
+            object.__setattr__(self, field, tuple(sorted(getattr(self, field), key=attrgetter(key))))
+        runs = _runs_by_id(self.runs)
+        if runs:
+            for occurrence in self.occurrences:
+                _check_grid_location(occurrence, runs)
 
     def resolve(self, claim_id: str) -> QuestionRecord:
         """Look up an observed claim by exact identity. An unseen ID raises KeyError."""
@@ -275,13 +325,19 @@ def _origin_dict(member):
 
 
 def _occurrence_dict(o):
-    return {
+    row = {
         **_origin_dict(o), 'claim_id': o.claim_id, 'verifier_id': o.verifier_id,
         'k': o.k, 'p': scalar_string(o.p),
         'archived_truth': o.archived_truth.value, 'archived_execution': o.archived_execution.value,
         'screen_status': o.screen_status, 'candidate_gap': o.candidate_gap,
         'replay_execution': o.replay_execution.value if o.replay_execution is not None else None,
     }
+    if o.replay_issues:
+        row['replay_issues'] = [
+            {'code': issue.code.value, 'message': issue.message, 'evidence_id': issue.evidence_id}
+            for issue in o.replay_issues
+        ]
+    return row
 
 
 def _fact_dict(f):
@@ -298,7 +354,12 @@ def _fact_dict(f):
 
 
 def question_to_dict(question: QuestionRecord) -> dict:
-    """Encode one v1 resolution with exact bounds and origins on every piece of support."""
+    """Encode one v1 resolution with exact bounds and origins on every piece of support.
+
+    An occurrence with verifier diagnostics includes replay_issues in return order.
+    Each entry carries the issue code, message and optional evidence ID so a caller
+    can audit an incomplete replay. Occurrences without diagnostics omit the field.
+    """
     return {
         'schema': 'nonlocalgames.ledger_question.v1', 'claim_id': question.claim_id,
         'verifier_id': question.verifier_id, 'status': question.status.value, 'reason': question.reason,
@@ -344,62 +405,47 @@ def _read_manifest(directory):
     try:
         if '..' in directory.parts:
             raise ValueError('Parent traversal in archive directory')
-        if any(path.is_symlink() for path in (directory, *directory.parents)):
-            raise ValueError('Archive directory traverses a symlink')
+        if directory.is_symlink():
+            raise ValueError('Selected archive directory is a symlink')
+        if directory.is_file():
+            raise ValueError('Selected archive is a file, expected a directory')
         manifest = load_checkpoint(directory / 'manifest.json', MANIFEST_BYTES)
         if isinstance(manifest, dict) and isinstance(manifest.get('run_id'), str):
             location = f"run_id={manifest['run_id']}"
         manifest = validate_manifest(manifest)
-        for entry in sorted(directory.iterdir()):
-            if entry.name not in {'manifest.json', 'members'}:
-                raise ValueError(f'Unexpected archive entry {entry.name!r}')
+        required = {'manifest.json', 'members'}
+        with os.scandir(directory) as entries:
+            for entry in entries:
+                if entry.name not in required:
+                    raise ValueError(f'Unexpected archive entry {entry.name!r}')
+                if entry.name == 'members' and not entry.is_dir(follow_symlinks=False):
+                    raise ValueError('Expected members to be a real directory')
+                required.remove(entry.name)
+        if required:
+            raise ValueError(f'Missing archive entry {min(required)!r}')
         return manifest
     except _ARCHIVE_ERRORS as error:
         raise _archive_error(error, location) from error
 
 
 def _member_count(members, steps):
-    if members.is_symlink():
-        raise ValueError('Expected a members directory, found a symlink')
-    try:
-        count = prefix_size(members, steps)
-    except ValueError as error:
-        if members.is_dir():
-            # Locate the grid position for a diagnostic only after prefix_size fails.
-            indices = set()
-            for entry in sorted(members.iterdir()):
-                if entry.suffix != '.json' or not entry.stem.isascii() or not entry.stem.isdecimal():
-                    continue
-                k = int(entry.stem)
-                if entry.name != f'{k}.json' or k > steps or entry.is_symlink() or not entry.is_file():
-                    raise ValueError(f'k={k}: {error}') from error
-                indices.add(k)
-            for k in range(max(indices, default=-1)):
-                if k not in indices:
-                    raise ValueError(f'k={k}: {error}') from error
-        raise
-    # The resumable writer can ignore temporary files. The ledger imports a
-    # recorded archive and requires every directory entry to be accounted for.
-    if members.is_dir():
-        names = {entry.name for entry in members.iterdir()}
-        extra = names.difference(f'{k}.json' for k in range(count))
-        if extra:
-            raise ValueError(f'Unexpected member checkpoint {min(extra)!r}')
+    if members.is_symlink() or not members.is_dir():
+        raise ValueError('Expected members to be a real directory')
+    # The manifest bounds this table before we read any directory entries. Each
+    # accepted name consumes one slot. An import has no temporary writer files.
+    pending = {f'{k}.json': k for k in range(steps + 1)}
+    with os.scandir(members) as entries:
+        for entry in entries:
+            k = pending.pop(entry.name, None)
+            if k is None:
+                raise ValueError(f'Unexpected member checkpoint {entry.name!r}')
+            if not entry.is_file(follow_symlinks=False):
+                raise ValueError(f'k={k}: expected a regular member checkpoint at {entry.name!r}')
+    count = steps + 1 - len(pending)
+    for k in range(count):
+        if f'{k}.json' in pending:
+            raise ValueError(f'k={k}: missing checkpoint inside member prefix')
     return count
-
-
-def _archived_verdict(record):
-    if record['generation_error'] is not None:
-        return TruthStatus.UNKNOWN, ExecutionStatus(record['generation_error']['status'])
-    receipt = record['assessment']
-    if (not isinstance(receipt, dict) or set(receipt) != set(ClaimAssessment.__dataclass_fields__)
-            or receipt['schema'] != ClaimAssessment.schema
-            or receipt['claim_id'] != record['claim_id'] or receipt['game_id'] != record['verifier_id']):
-        raise ValueError('Invalid archived claim assessment fields, schema or binding')
-    truth, execution = TruthStatus(receipt['truth']), ExecutionStatus(receipt['execution'])
-    if execution != ExecutionStatus.COMPLETED and truth != TruthStatus.UNKNOWN:
-        raise ValueError('A non-completed archived assessment cannot carry a verdict')
-    return truth, execution
 
 
 def _replayed_scalar(value):
@@ -414,20 +460,24 @@ def _load_observation(manifest, k, record, limit):
     result, review = None, None
     if limit is None:
         _weighted_record.validate_member_binding(manifest, k, record)
-        _weighted_record.check_screen_shape(record['screen'], manifest)
-        for raw in record['evidence']:
-            artifact = evidence_from_dict(raw, max_bytes=MEMBER_BYTES)
-            if artifact.game_id != record['verifier_id']:
-                raise ValueError('Archived evidence belongs to a different game verifier')
+        if record['generation_error'] is None:
+            _weighted_record.check_screen_shape(record['screen'], manifest)
+            artifacts = (evidence_from_dict(raw, max_bytes=MEMBER_BYTES) for raw in record['evidence'])
+            _weighted_record.validate_observed_assessment(record, artifacts)
     else:
-        result, review = _weighted_record.verify_member_assessment(manifest, k, record, limit)
-    truth, execution = _archived_verdict(record)
+        result, review = _weighted_record.verify_member_assessment(
+            manifest, k, record, limit, preserve_incomplete=True)
+    if record['generation_error'] is None:
+        truth, execution = record['assessment']['truth'], record['assessment']['execution']
+    else:
+        truth, execution = TruthStatus.UNKNOWN, record['generation_error']['status']
     occurrence = Occurrence(
         run_id=manifest['run_id'], member_id=record['member_id'], claim_id=record['claim_id'],
         verifier_id=record['verifier_id'], k=k, p=parse_rational(record['p'], canonical=True),
         archived_truth=truth, archived_execution=execution, screen_status=record['screen']['status'],
         candidate_gap=record['screen'].get('candidate_gap'),
         replay_execution=None if review is None else ExecutionStatus(review['execution']),
+        replay_issues=() if result is None else result.issues,
     )
     if result is None or result.execution != ExecutionStatus.COMPLETED:
         return occurrence, None
@@ -495,7 +545,4 @@ def load_ledger(
             occurrences.append(occurrence)
             if fact is not None:
                 facts.append(fact)
-    runs = tuple(runs)
-    occurrences = tuple(sorted(occurrences, key=attrgetter('origin')))
-    facts = tuple(sorted(facts, key=attrgetter('origin')))
-    return Ledger(runs, occurrences, facts, join_occurrences(occurrences, facts, runs))
+    return Ledger(tuple(runs), tuple(occurrences), tuple(facts), join_occurrences(occurrences, facts, runs))

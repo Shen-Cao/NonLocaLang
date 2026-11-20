@@ -5,6 +5,7 @@ from math import isfinite
 
 from ..analysis import xor_quantum_value
 from ..claims import GapClaim, assess_gap, assessment_to_dict, claim_id, evidence_from_dict, evidence_to_dict
+from ..claims.serialization import assessment_from_dict
 from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus
 from ..core.identity import JSONBudgetExceeded, canonical_json, verifier_id
 from ..core.resources import ResourceSpec
@@ -139,7 +140,9 @@ def generate_member(manifest, k, budget, *, template=None):
 
 def _review(binding, result, error, screen):
     local = _local_value(result)
-    lower, upper = (None, None) if result is None else (result.intervals[0].lower, result.intervals[0].upper)
+    lower, upper = None, None
+    if result is not None and result.execution == ExecutionStatus.COMPLETED:
+        lower, upper = result.intervals[0].lower, result.intervals[0].upper
     gap = None if lower is None or local is None else lower-local
     return {**{key: binding[key] for key in ('k', 'p', 'claim_id')},
             'truth': 'unknown' if result is None else result.truth.value,
@@ -170,6 +173,7 @@ def validate_member_binding(manifest, k, record):
                 or error['status'] != 'budget_exceeded' or not isinstance(error['detail'], str)
                 or raw != [] or record['assessment'] is not None):
             raise ValueError('Invalid generation failure record')
+        _check_screen(record['screen'], manifest, None)
     else:
         expected = ['local_enumeration', 'quantum_strategy']
         if p <= Fraction(1, 10) or p == 1:
@@ -180,12 +184,22 @@ def validate_member_binding(manifest, k, record):
     return game, binding
 
 
-def verify_member_assessment(manifest, k, record, budget) -> tuple[ClaimAssessment | None, dict]:
-    """Return the replayed assessment and review. A generation failure has only a review."""
+def validate_observed_assessment(record, artifacts):
+    """Validate an archived observation against this member's decoded envelopes."""
+    assessment_from_dict(record['assessment'], claim_id=record['claim_id'],
+                         game_id=record['verifier_id'], artifacts=artifacts)
+
+
+def verify_member_assessment(manifest, k, record, budget, *,
+                             preserve_incomplete=False) -> tuple[ClaimAssessment | None, dict]:
+    """Return the replayed assessment and review. A generation failure has only a review.
+
+    Ledger callers can preserve a returned execution failure and its issues. Exceptions
+    raised while decoding or replaying evidence continue to propagate.
+    """
     game, binding = validate_member_binding(manifest, k, record)
     raw, error = record['evidence'], record['generation_error']
     if error is not None:
-        _check_screen(record['screen'], manifest, None)
         return None, _review(binding, None, error, record['screen'])
     if len(raw) > budget.max_artifacts:
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Replay exceeds max_artifacts')
@@ -193,7 +207,14 @@ def verify_member_assessment(manifest, k, record, budget) -> tuple[ClaimAssessme
         artifacts = tuple(evidence_from_dict(item, max_bytes=budget.max_artifact_bytes) for item in raw)
     except JSONBudgetExceeded as exc:
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Replay exceeds max_artifact_bytes') from exc
+    if preserve_incomplete:
+        # A returned failure cannot reproduce the archived verdict. Validate its
+        # observation before replay so even a failed attempt has a bound origin.
+        check_screen_shape(record['screen'], manifest)
+        validate_observed_assessment(record, artifacts)
     result = assess_gap(game, _CLAIM, artifacts, budget=budget)
+    if preserve_incomplete and result.execution != ExecutionStatus.COMPLETED:
+        return result, _review(binding, result, None, record['screen'])
     if result.execution == 'budget_exceeded':
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, f'Replay budget exhausted at member {k}')
     if result.execution != 'completed':

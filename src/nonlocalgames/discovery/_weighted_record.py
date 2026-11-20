@@ -4,14 +4,16 @@ from hashlib import sha256
 from math import isfinite
 
 from ..analysis import xor_quantum_value
+from ..certificates.quantum import QUANTUM_LOWER_SCHEMA
+from ..certificates.xor import XOR_DUAL_SCHEMA
 from ..claims import (EvidenceKind, GapClaim, assess_gap, assessment_to_dict, claim_id,
                       evidence_from_dict, evidence_to_dict)
 from ..claims.admission import bound_intervals
 from ..claims.serialization import assessment_from_dict
 from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus
-from ..core.identity import JSONBudgetExceeded, canonical_json, verifier_id
+from ..core.identity import JSONBudgetExceeded, VERIFIER_ID_PREFIX, canonical_json, verifier_id
 from ..core.resources import Resource, ResourceSpec
-from ..core.scalar_wire import scalar_string
+from ..core.scalar_wire import parse_rational, scalar_string
 from ..games import biased_chsh
 from .weighted_chsh import weighted_chsh_member
 
@@ -186,20 +188,58 @@ def validate_member_binding(manifest, k, record):
     return game, binding
 
 
+def _weighted_payload(artifact, fields, *, schema=None):
+    payload = artifact.payload
+    if not isinstance(payload, dict) or payload.keys() != fields:
+        raise ValueError(f'Invalid {artifact.kind.value} payload fields')
+    if schema is not None and (payload['schema'] != schema
+                               or payload['game_fingerprint'] != artifact.game_id.removeprefix(VERIFIER_ID_PREFIX)):
+        raise ValueError(f'Invalid {artifact.kind.value} payload schema or game fingerprint')
+    return payload
+
+
+def _payload_rational(value, field):
+    if not isinstance(value, str):
+        raise ValueError(f'Weighted payload {field} must be a canonical rational string')
+    return parse_rational(value, canonical=True)
+
+
 def _validate_weighted_check(check, artifact):
+    """Bind the receipt to the witness declarations. Only replay verifies the witness."""
     if artifact.kind == EvidenceKind.LOCAL_ENUMERATION:
         checker, resource = 'local_enumeration_replay.v1', Resource.LOCAL
-        valid_bounds = (check.lower is not None and check.lower == check.upper == check.attained_score
+        payload = _weighted_payload(artifact, {'strategy', 'value'})
+        value = _payload_rational(payload['value'], 'value')
+        valid_bounds = (value == check.lower == check.upper == check.attained_score
                         and check.actual_dimensions is None)
     elif artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
         checker, resource = 'rational_quantum_strategy.v1', Resource.QUANTUM_FINITE
-        # EvidenceCheck already requires positive integers for any supplied dimensions.
-        valid_bounds = (check.lower is not None and check.attained_score == check.lower
-                        and check.upper is None and check.actual_dimensions is not None
-                        and len(check.actual_dimensions) == 2)
+        payload = _weighted_payload(artifact, {'schema', 'resource', 'game_fingerprint', 'strategy', 'lower_bound'},
+                                    schema=QUANTUM_LOWER_SCHEMA)
+        if payload['resource'] != resource.value:
+            raise ValueError('Invalid quantum_strategy payload resource')
+        strategy = payload['strategy']
+        if not isinstance(strategy, dict):
+            raise ValueError('Weighted quantum_strategy payload strategy must be an object')
+        dimensions = strategy['dimensions']
+        if (not isinstance(dimensions, list) or len(dimensions) != 2
+                or any(type(d) is not int or d <= 0 for d in dimensions)):
+            raise ValueError('Weighted quantum_strategy payload dimensions must be two positive integers')
+        lower = _payload_rational(payload['lower_bound'], 'lower_bound')
+        valid_bounds = (lower == check.lower == check.attained_score and check.upper is None
+                        and tuple(dimensions) == check.actual_dimensions)
     elif artifact.kind == EvidenceKind.XOR_DUAL:
         checker, resource = 'rational_xor_dual.v1', Resource.QUANTUM_COMMUTING
-        valid_bounds = (check.lower is None and check.upper is not None
+        payload = _weighted_payload(artifact, {'schema', 'game_fingerprint', 'diagonal', 'upper_bound'},
+                                    schema=XOR_DUAL_SCHEMA)
+        diagonal = payload['diagonal']
+        # The weighted CHSH Gram matrix has two inputs for each of two parties.
+        if not isinstance(diagonal, list) or len(diagonal) != 4:
+            raise ValueError('Weighted xor_dual payload diagonal must have four entries')
+        for entry in diagonal:
+            _payload_rational(entry, 'diagonal')
+        upper = _payload_rational(payload['upper_bound'], 'upper_bound')
+        valid_bounds = (check.lower is None and check.upper == upper
                         and check.attained_score is None and check.actual_dimensions is None)
     else:
         raise ValueError(f'Unexpected weighted evidence kind {artifact.kind.value}')

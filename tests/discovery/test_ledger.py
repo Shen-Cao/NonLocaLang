@@ -10,7 +10,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from nonlocalgames.claims import VerificationBudget, assessment_to_dict, evidence_from_dict
+from nonlocalgames.claims import VerificationBudget, assessment_to_dict, evidence_from_dict, evidence_to_dict
 from nonlocalgames.claims.serialization import assessment_from_dict
 from nonlocalgames.claims.types import ClaimAssessment, ClaimIssue, EvidenceError, ExecutionStatus, TruthStatus
 from nonlocalgames.core.identity import canonical_json
@@ -561,6 +561,7 @@ def _assert_rejected_origin(path, replay, match=None, *, budget=None):
     assert all(s in str(caught.value) for s in
                (member['run_id'], f"k={member['k']}", member['member_id']))
     assert caught.value.__cause__ is not None
+    return caught.value
 
 
 def _set_nested(record, path, value):
@@ -584,11 +585,9 @@ def _set_nested(record, path, value):
     (('issues',), [{'code': 'invalid_evidence', 'message': 'missing ID field'}]),
     (('derivation',), [2]), (('verified_evidence',), 'artifact'), (('numerical_hints',), {}),
 ])
-def test_fast_load_rejects_malformed_nested_receipt(archives, tmp_path, fields, value):
-    archive = shutil.copytree(archives[0], tmp_path / 'archive')
-    member = archive / 'members/0.json'
-    _rewrite_member(member, lambda row: _set_nested(row['assessment'], fields, value))
-    _assert_rejected_origin(member, replay=False)
+def test_admission_rejects_malformed_nested_receipt(member_with_dual, reject_before_assess, fields, value):
+    _rewrite_member(member_with_dual, lambda row: _set_nested(row['assessment'], fields, value))
+    reject_before_assess(member_with_dual)
 
 
 @pytest.mark.parametrize('fields', [
@@ -635,31 +634,163 @@ def member_with_dual(archives, tmp_path):
     return archive / 'members/0.json'
 
 
-@pytest.mark.parametrize('field', ['intervals', 'checks'])
-@pytest.mark.parametrize('replay', [False, True], ids=['fast', 'budget-limited'])
-def test_empty_completed_receipt_sections_reject_before_replay(member_with_dual, monkeypatch, field, replay):
-    _rewrite_member(member_with_dual, lambda row: row['assessment'].update({field: []}))
+def _replace_payload(row, index, payload):
+    """Make a new envelope and rebind every receipt reference before rehashing the member."""
+    old = evidence_from_dict(row['evidence'][index])
+    new = replace(old, payload_json=canonical_json(payload))
+    row['evidence'][index] = evidence_to_dict(new)
+    old_id, new_id = old.artifact_id, new.artifact_id
+    receipt = row['assessment']
+    assert receipt['checks'][index]['artifact_id'] == old_id
+    receipt['checks'][index]['artifact_id'] = new_id
+    refs = [receipt['verified_evidence']]
+    for interval in receipt['intervals']:
+        refs.extend((interval['lower_refs'], interval['upper_refs']))
+    for ids in refs:
+        if old_id in ids:
+            ids[ids.index(old_id)] = new_id
+            ids.sort()
+
+
+@pytest.fixture(params=[False, True], ids=['fast', 'budget-limited'])
+def reject_before_assess(request, monkeypatch):
     monkeypatch.setattr(records, 'assess_gap', lambda *a, **kw: pytest.fail('malformed receipt reached replay'))
+    replay = request.param
     budget = VerificationBudget(max_strategies=1) if replay else None
-    _assert_rejected_origin(member_with_dual, replay=replay, match=field, budget=budget)
+
+    def reject(member, match=None):
+        error = _assert_rejected_origin(member, replay=replay, match=match, budget=budget)
+        return str(error.__cause__)
+
+    return reject
 
 
-def test_completed_receipt_rejects_duplicate_verified_evidence(member_with_dual):
+@pytest.mark.parametrize('field', ['intervals', 'checks'])
+def test_empty_completed_receipt_sections_reject_before_replay(member_with_dual, reject_before_assess, field):
+    _rewrite_member(member_with_dual, lambda row: row['assessment'].update({field: []}))
+    reject_before_assess(member_with_dual, field)
+
+
+def test_completed_receipt_rejects_duplicate_verified_evidence(member_with_dual, reject_before_assess):
     def duplicate(row):
         ids = row['assessment']['verified_evidence']
         ids.append(ids[0])
     _rewrite_member(member_with_dual, duplicate)
-    _assert_rejected_origin(member_with_dual, replay=False, match='verified_evidence')
+    reject_before_assess(member_with_dual, 'verified_evidence')
 
 
-def test_completed_receipt_binds_local_check_to_local_resource(member_with_dual):
+def test_completed_receipt_binds_local_check_to_local_resource(member_with_dual, reject_before_assess):
     _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][0].update(resource='quantum_finite'))
-    _assert_rejected_origin(member_with_dual, replay=False, match='local_enumeration')
+    reject_before_assess(member_with_dual, 'local_enumeration')
 
 
-def test_completed_receipt_requires_two_quantum_dimensions(member_with_dual):
+def test_completed_receipt_requires_two_quantum_dimensions(member_with_dual, reject_before_assess):
     _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][1].update(actual_dimensions=[2]))
-    _assert_rejected_origin(member_with_dual, replay=False, match='quantum_strategy')
+    reject_before_assess(member_with_dual, 'quantum_strategy')
+
+
+def test_quantum_check_dimensions_must_match_payload(member_with_dual, reject_before_assess):
+    def corrupt(row):
+        assert row['evidence'][1]['payload']['strategy']['dimensions'] == [2, 2]
+        row['assessment']['checks'][1]['actual_dimensions'] = [2, 3]
+
+    _rewrite_member(member_with_dual, corrupt)
+    assert reject_before_assess(member_with_dual) == (
+        'Invalid bounds or dimensions for the rational_quantum_strategy.v1 check')
+
+
+@pytest.mark.parametrize('index', [0, 1, 2], ids=['local-value', 'quantum-lower', 'xor-upper'])
+def test_receipt_bound_must_match_payload_even_if_derived_intervals_agree(
+        member_with_dual, reject_before_assess, index):
+    def corrupt(row):
+        receipt = row['assessment']
+        check = receipt['checks'][index]
+        quantum, local = receipt['intervals']
+        field = ('value', 'lower_bound', 'upper_bound')[index]
+        assert row['evidence'][index]['payload'][field] == '1'
+        if index == 0:
+            check.update(lower='3/4', upper='3/4', attained_score='3/4')
+            quantum['lower_refs'].remove(check['artifact_id'])
+            local.update(lower='3/4', upper='3/4', upper_refs=[check['artifact_id']])
+        elif index == 1:
+            check.update(lower='3/4', attained_score='3/4')
+            quantum['lower_refs'].remove(check['artifact_id'])
+        else:
+            check['upper'] = quantum['upper'] = '5/4'
+            local['upper_refs'].remove(check['artifact_id'])
+
+    _rewrite_member(member_with_dual, corrupt)
+    checker = _read(member_with_dual)['assessment']['checks'][index]['checker']
+    assert reject_before_assess(member_with_dual) == f'Invalid bounds or dimensions for the {checker} check'
+
+
+@pytest.mark.parametrize(('payload_dims', 'check_dims'), [
+    ([True, 2], [1, 2]), ([2.0, 2], [2, 2]), (['2', 2], [2, 2]), ([], [2, 2]),
+    ([2], [2, 2]), ('22', [2, 2]), ([-1, 2], [1, 2]), ([0, 2], [1, 2]),
+])
+def test_quantum_payload_dimensions_require_two_positive_json_integers(
+        member_with_dual, reject_before_assess, payload_dims, check_dims):
+    def corrupt(row):
+        payload = row['evidence'][1]['payload']
+        strategy = {**payload['strategy'], 'dimensions': payload_dims}
+        _replace_payload(row, 1, {**payload, 'strategy': strategy})
+        row['assessment']['checks'][1]['actual_dimensions'] = check_dims
+
+    _rewrite_member(member_with_dual, corrupt)
+    reject_before_assess(member_with_dual, 'dimensions must be two positive integers')
+
+
+@pytest.mark.parametrize(('index', 'field', 'value', 'message'), [
+    (0, 'value', 1, 'rational string'), (0, 'value', '2/2', 'canonical rational string'),
+    (1, 'lower_bound', 1, 'rational string'), (1, 'lower_bound', '1.0', 'canonical rational string'),
+    (2, 'upper_bound', 1, 'rational string'), (2, 'upper_bound', '+1', 'canonical rational string'),
+    (2, 'diagonal', '0000', 'diagonal'), (2, 'diagonal', ['0'], 'diagonal'),
+    (2, 'diagonal', ['0', 0, '0', '0'], 'rational string'),
+    (2, 'diagonal', ['0', '0', '0', '0/2'], 'canonical rational string'),
+    (1, 'strategy', [], 'strategy'), (1, 'resource', 'local', 'resource'),
+    (1, 'game_fingerprint', 'foreign', 'game fingerprint'), (2, 'schema', 'foreign', 'schema'),
+])
+def test_weighted_payload_declarations_must_be_well_formed(
+        member_with_dual, reject_before_assess, index, field, value, message):
+    _rewrite_member(member_with_dual, lambda row: _replace_payload(
+        row, index, {**row['evidence'][index]['payload'], field: value}))
+    reject_before_assess(member_with_dual, message)
+
+
+@pytest.mark.parametrize('index', [0, 1, 2], ids=['local', 'quantum', 'xor'])
+@pytest.mark.parametrize('change', ['not-object', 'extra-field', 'missing-field'])
+def test_weighted_payload_requires_exact_field_set(member_with_dual, reject_before_assess, index, change):
+    def corrupt(row):
+        payload = row['evidence'][index]['payload'].copy()
+        if change == 'not-object':
+            payload = []
+        elif change == 'extra-field':
+            payload['extra'] = 0
+        else:
+            del payload[('strategy', 'strategy', 'diagonal')[index]]
+        _replace_payload(row, index, payload)
+
+    _rewrite_member(member_with_dual, corrupt)
+    reject_before_assess(member_with_dual, 'payload fields')
+
+
+def test_matching_rectangular_quantum_strategy_passes_admission_and_replay(member_with_dual):
+    from nonlocalgames.quantum.exact import ExactQuantumStrategy, strategy_to_dict
+    from nonlocalgames.quantum.exact.algebra import identity, scale
+
+    # Both parties always answer zero, attaining one at p=0 with a 2-by-3 product space.
+    measurements = tuple(((identity(d), scale(identity(d), 0)),) * 2 for d in (2, 3))
+    strategy = ExactQuantumStrategy(scale(identity(6), Fraction(1, 6)), measurements)
+
+    def replace_strategy(row):
+        _replace_payload(row, 1, {**row['evidence'][1]['payload'], 'strategy': strategy_to_dict(strategy)})
+        row['assessment']['checks'][1]['actual_dimensions'] = [2, 3]
+
+    _rewrite_member(member_with_dual, replace_strategy)
+    archive = member_with_dual.parent.parent
+    assert _at(load_ledger(archive, replay=False), Fraction(0)).status == 'unverified'
+    fact, = _at(load_ledger(archive), Fraction(0)).facts
+    assert fact.quantum_lower == 1 and fact.member_id == _read(member_with_dual)['member_id']
 
 
 @pytest.mark.parametrize(('index', 'update'), [
@@ -669,13 +800,18 @@ def test_completed_receipt_requires_two_quantum_dimensions(member_with_dual):
     (2, {'upper': None}), (2, {'attained_score': '1'}), (2, {'lower': '0'}),
     (2, {'is_proof': False, 'upper': None}), (2, {'checker': 'untrusted_observation.v1'}),
 ])
-def test_completed_receipt_requires_weighted_checker_fields(member_with_dual, index, update):
+def test_completed_receipt_requires_weighted_checker_fields(member_with_dual, reject_before_assess, index, update):
     _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][index].update(update))
-    _assert_rejected_origin(member_with_dual, replay=False, match='check')
+    checker = ('local_enumeration_replay.v1', 'rational_quantum_strategy.v1', 'rational_xor_dual.v1')[index]
+    if 'checker' in update or 'is_proof' in update:
+        expected = 'Weighted xor_dual evidence requires a rational_xor_dual.v1 proof check on quantum_commuting'
+    else:
+        expected = f'Invalid bounds or dimensions for the {checker} check'
+    assert reject_before_assess(member_with_dual) == expected
 
 
 @pytest.mark.parametrize('change', ['duplicate', 'swap_ids'])
-def test_completed_receipt_pairs_each_artifact_with_its_checker(member_with_dual, change):
+def test_completed_receipt_pairs_each_artifact_with_its_checker(member_with_dual, reject_before_assess, change):
     def corrupt(row):
         checks = row['assessment']['checks']
         if change == 'duplicate':
@@ -683,49 +819,50 @@ def test_completed_receipt_pairs_each_artifact_with_its_checker(member_with_dual
         else:
             checks[0]['artifact_id'], checks[1]['artifact_id'] = checks[1]['artifact_id'], checks[0]['artifact_id']
     _rewrite_member(member_with_dual, corrupt)
-    _assert_rejected_origin(member_with_dual, replay=False, match='check')
+    reject_before_assess(member_with_dual, 'Duplicate weighted check' if change == 'duplicate' else 'proof check on')
 
 
 @pytest.mark.parametrize('field', ['numerical_hints', 'issues'])
-def test_completed_receipt_requires_empty_hints_and_issues(member_with_dual, field):
+def test_completed_receipt_requires_empty_hints_and_issues(member_with_dual, reject_before_assess, field):
     def corrupt(row):
         entry = row['evidence'][0]['artifact_id']
         if field == 'issues':
             entry = {'code': 'checker_error', 'message': 'reported issue', 'evidence_id': entry}
         row['assessment'][field].append(entry)
     _rewrite_member(member_with_dual, corrupt)
-    _assert_rejected_origin(member_with_dual, replay=False, match='hints|issues')
+    reject_before_assess(member_with_dual, 'hints|issues')
 
 
 @pytest.mark.parametrize(('field', 'value'), [
     ('lower', '0'), ('upper', None), ('lower_refs', []), ('upper_refs', []),
 ])
-def test_completed_receipt_interval_matches_bounds_and_references(member_with_dual, field, value):
+def test_completed_receipt_interval_matches_bounds_and_references(member_with_dual, reject_before_assess, field, value):
     _rewrite_member(member_with_dual, lambda row: row['assessment']['intervals'][0].update({field: value}))
-    _assert_rejected_origin(member_with_dual, replay=False, match='intervals')
+    reject_before_assess(member_with_dual, 'intervals')
 
 
 @pytest.mark.parametrize('field', ['intervals', 'derivation'])
-def test_completed_receipt_requires_derived_interval_and_rule_order(member_with_dual, field):
+def test_completed_receipt_requires_derived_interval_and_rule_order(member_with_dual, reject_before_assess, field):
     _rewrite_member(member_with_dual, lambda row: row['assessment'][field].reverse())
-    _assert_rejected_origin(member_with_dual, replay=False, match=field)
+    reject_before_assess(member_with_dual, field)
 
 
-def test_completed_receipt_rejects_contradictory_derived_bounds(member_with_dual):
+def test_completed_receipt_rejects_contradictory_derived_bounds(member_with_dual, reject_before_assess):
     def corrupt(row):
+        _replace_payload(row, 2, {**row['evidence'][2]['payload'], 'upper_bound': '1/2'})
         receipt = row['assessment']
         dual = receipt['checks'][2]
         dual['upper'] = '1/2'
         for interval in receipt['intervals']:
             interval.update(upper=dual['upper'], upper_refs=[dual['artifact_id']])
     _rewrite_member(member_with_dual, corrupt)
-    _assert_rejected_origin(member_with_dual, replay=False, match='Inconsistent bounds')
+    reject_before_assess(member_with_dual, 'Inconsistent bounds')
 
 
-def test_stored_weighted_assessment_requires_completed_execution(member_with_dual):
+def test_stored_weighted_assessment_requires_completed_execution(member_with_dual, reject_before_assess):
     _rewrite_member(member_with_dual, lambda row: row['assessment'].update(
         execution='budget_exceeded', truth='unknown'))
-    _assert_rejected_origin(member_with_dual, replay=False, match='completed weighted receipt')
+    reject_before_assess(member_with_dual, 'completed weighted receipt')
 
 
 def test_legacy_verifier_still_reports_divergent_receipt_after_replay(member_with_dual):

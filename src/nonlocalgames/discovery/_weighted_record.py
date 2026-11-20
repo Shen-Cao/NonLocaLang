@@ -4,11 +4,13 @@ from hashlib import sha256
 from math import isfinite
 
 from ..analysis import xor_quantum_value
-from ..claims import GapClaim, assess_gap, assessment_to_dict, claim_id, evidence_from_dict, evidence_to_dict
+from ..claims import (EvidenceKind, GapClaim, assess_gap, assessment_to_dict, claim_id,
+                      evidence_from_dict, evidence_to_dict)
+from ..claims.admission import bound_intervals
 from ..claims.serialization import assessment_from_dict
 from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus
 from ..core.identity import JSONBudgetExceeded, canonical_json, verifier_id
-from ..core.resources import ResourceSpec
+from ..core.resources import Resource, ResourceSpec
 from ..core.scalar_wire import scalar_string
 from ..games import biased_chsh
 from .weighted_chsh import weighted_chsh_member
@@ -184,10 +186,62 @@ def validate_member_binding(manifest, k, record):
     return game, binding
 
 
+def _validate_weighted_check(check, artifact):
+    if artifact.kind == EvidenceKind.LOCAL_ENUMERATION:
+        checker, resource = 'local_enumeration_replay.v1', Resource.LOCAL
+        valid_bounds = (check.lower is not None and check.lower == check.upper == check.attained_score
+                        and check.actual_dimensions is None)
+    elif artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
+        checker, resource = 'rational_quantum_strategy.v1', Resource.QUANTUM_FINITE
+        # EvidenceCheck already requires positive integers for any supplied dimensions.
+        valid_bounds = (check.lower is not None and check.attained_score == check.lower
+                        and check.upper is None and check.actual_dimensions is not None
+                        and len(check.actual_dimensions) == 2)
+    elif artifact.kind == EvidenceKind.XOR_DUAL:
+        checker, resource = 'rational_xor_dual.v1', Resource.QUANTUM_COMMUTING
+        valid_bounds = (check.lower is None and check.upper is not None
+                        and check.attained_score is None and check.actual_dimensions is None)
+    else:
+        raise ValueError(f'Unexpected weighted evidence kind {artifact.kind.value}')
+    if (not check.is_proof or check.checker != checker or check.resource != resource
+            or artifact.resource != ResourceSpec(resource)):
+        raise ValueError(f'Weighted {artifact.kind.value} evidence requires a {checker} '
+                         f'proof check on {resource.value}')
+    if not valid_bounds:
+        raise ValueError(f'Invalid bounds or dimensions for the {checker} check')
+
+
 def validate_observed_assessment(record, artifacts):
-    """Validate an archived observation against this member's decoded envelopes."""
-    assessment_from_dict(record['assessment'], claim_id=record['claim_id'],
-                         game_id=record['verifier_id'], artifacts=artifacts)
+    """Check the internal consistency of a weighted receipt. Proof still requires replay."""
+    artifacts = tuple(artifacts)
+    assessment = assessment_from_dict(record['assessment'], claim_id=record['claim_id'],
+                                      game_id=record['verifier_id'], artifacts=artifacts)
+    if assessment.execution != ExecutionStatus.COMPLETED:
+        raise ValueError('Expected a completed weighted receipt')
+    if assessment.numerical_hints or assessment.issues:
+        raise ValueError('A completed weighted receipt must have empty numerical_hints and issues')
+
+    by_id = {artifact.artifact_id: artifact for artifact in artifacts}
+    if (len(assessment.verified_evidence) != len(by_id)
+            or set(assessment.verified_evidence) != by_id.keys()):
+        raise ValueError('Weighted verified_evidence must name each member artifact exactly once')
+    if len(assessment.checks) != len(artifacts):
+        raise ValueError('Weighted checks must cover each member artifact exactly once')
+    for check in assessment.checks:
+        artifact = by_id.pop(check.artifact_id, None)
+        if artifact is None:
+            raise ValueError(f'Duplicate weighted check for artifact {check.artifact_id}')
+        _validate_weighted_check(check, artifact)
+
+    intervals, rules = bound_intervals(assessment.checks)
+    by_resource = {interval.resource: interval for interval in intervals}
+    expected = (by_resource[_CLAIM.higher.kind], by_resource[_CLAIM.lower.kind])
+    if assessment.intervals != expected:
+        raise ValueError('Weighted receipt intervals must equal the derived quantum_finite and local intervals')
+    if assessment.derivation != rules:
+        raise ValueError('Weighted receipt derivation differs from the rules for its checks')
+    if any(i.lower is not None and i.upper is not None and i.lower > i.upper for i in intervals):
+        raise ValueError('Inconsistent bounds in completed weighted receipt intervals')
 
 
 def verify_member_assessment(manifest, k, record, budget, *,

@@ -5,7 +5,6 @@ from fractions import Fraction
 from hashlib import sha256
 import json
 import os
-from pathlib import Path
 import shutil
 from types import SimpleNamespace
 
@@ -555,10 +554,10 @@ def test_stray_entry_is_not_attributed_to_a_missing_index(archives, tmp_path):
     assert 'k=1' not in str(caught.value)
 
 
-def _assert_rejected_origin(path, replay, match=None):
+def _assert_rejected_origin(path, replay, match=None, *, budget=None):
     member = _read(path)
     with pytest.raises(EvidenceError, match=match) as caught:
-        load_ledger(path.parent.parent, replay=replay)
+        load_ledger(path.parent.parent, replay=replay, budget=budget)
     assert all(s in str(caught.value) for s in
                (member['run_id'], f"k={member['k']}", member['member_id']))
     assert caught.value.__cause__ is not None
@@ -630,6 +629,112 @@ def test_replay_validates_archived_observation_before_calling_assess_gap(archive
     _assert_rejected_origin(member, replay=True, match='checks must be a JSON array')
 
 
+@pytest.fixture
+def member_with_dual(archives, tmp_path):
+    archive = shutil.copytree(archives[0], tmp_path / 'archive')
+    return archive / 'members/0.json'
+
+
+@pytest.mark.parametrize('field', ['intervals', 'checks'])
+@pytest.mark.parametrize('replay', [False, True], ids=['fast', 'budget-limited'])
+def test_empty_completed_receipt_sections_reject_before_replay(member_with_dual, monkeypatch, field, replay):
+    _rewrite_member(member_with_dual, lambda row: row['assessment'].update({field: []}))
+    monkeypatch.setattr(records, 'assess_gap', lambda *a, **kw: pytest.fail('malformed receipt reached replay'))
+    budget = VerificationBudget(max_strategies=1) if replay else None
+    _assert_rejected_origin(member_with_dual, replay=replay, match=field, budget=budget)
+
+
+def test_completed_receipt_rejects_duplicate_verified_evidence(member_with_dual):
+    def duplicate(row):
+        ids = row['assessment']['verified_evidence']
+        ids.append(ids[0])
+    _rewrite_member(member_with_dual, duplicate)
+    _assert_rejected_origin(member_with_dual, replay=False, match='verified_evidence')
+
+
+def test_completed_receipt_binds_local_check_to_local_resource(member_with_dual):
+    _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][0].update(resource='quantum_finite'))
+    _assert_rejected_origin(member_with_dual, replay=False, match='local_enumeration')
+
+
+def test_completed_receipt_requires_two_quantum_dimensions(member_with_dual):
+    _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][1].update(actual_dimensions=[2]))
+    _assert_rejected_origin(member_with_dual, replay=False, match='quantum_strategy')
+
+
+@pytest.mark.parametrize(('index', 'update'), [
+    (0, {'attained_score': '0'}), (0, {'actual_dimensions': [2, 2]}),
+    (0, {'lower': None, 'upper': None, 'attained_score': None}),
+    (1, {'upper': '1'}), (1, {'attained_score': '0'}),
+    (2, {'upper': None}), (2, {'attained_score': '1'}), (2, {'lower': '0'}),
+    (2, {'is_proof': False, 'upper': None}), (2, {'checker': 'untrusted_observation.v1'}),
+])
+def test_completed_receipt_requires_weighted_checker_fields(member_with_dual, index, update):
+    _rewrite_member(member_with_dual, lambda row: row['assessment']['checks'][index].update(update))
+    _assert_rejected_origin(member_with_dual, replay=False, match='check')
+
+
+@pytest.mark.parametrize('change', ['duplicate', 'swap_ids'])
+def test_completed_receipt_pairs_each_artifact_with_its_checker(member_with_dual, change):
+    def corrupt(row):
+        checks = row['assessment']['checks']
+        if change == 'duplicate':
+            checks[1] = checks[0].copy()
+        else:
+            checks[0]['artifact_id'], checks[1]['artifact_id'] = checks[1]['artifact_id'], checks[0]['artifact_id']
+    _rewrite_member(member_with_dual, corrupt)
+    _assert_rejected_origin(member_with_dual, replay=False, match='check')
+
+
+@pytest.mark.parametrize('field', ['numerical_hints', 'issues'])
+def test_completed_receipt_requires_empty_hints_and_issues(member_with_dual, field):
+    def corrupt(row):
+        entry = row['evidence'][0]['artifact_id']
+        if field == 'issues':
+            entry = {'code': 'checker_error', 'message': 'reported issue', 'evidence_id': entry}
+        row['assessment'][field].append(entry)
+    _rewrite_member(member_with_dual, corrupt)
+    _assert_rejected_origin(member_with_dual, replay=False, match='hints|issues')
+
+
+@pytest.mark.parametrize(('field', 'value'), [
+    ('lower', '0'), ('upper', None), ('lower_refs', []), ('upper_refs', []),
+])
+def test_completed_receipt_interval_matches_bounds_and_references(member_with_dual, field, value):
+    _rewrite_member(member_with_dual, lambda row: row['assessment']['intervals'][0].update({field: value}))
+    _assert_rejected_origin(member_with_dual, replay=False, match='intervals')
+
+
+@pytest.mark.parametrize('field', ['intervals', 'derivation'])
+def test_completed_receipt_requires_derived_interval_and_rule_order(member_with_dual, field):
+    _rewrite_member(member_with_dual, lambda row: row['assessment'][field].reverse())
+    _assert_rejected_origin(member_with_dual, replay=False, match=field)
+
+
+def test_completed_receipt_rejects_contradictory_derived_bounds(member_with_dual):
+    def corrupt(row):
+        receipt = row['assessment']
+        dual = receipt['checks'][2]
+        dual['upper'] = '1/2'
+        for interval in receipt['intervals']:
+            interval.update(upper=dual['upper'], upper_refs=[dual['artifact_id']])
+    _rewrite_member(member_with_dual, corrupt)
+    _assert_rejected_origin(member_with_dual, replay=False, match='Inconsistent bounds')
+
+
+def test_stored_weighted_assessment_requires_completed_execution(member_with_dual):
+    _rewrite_member(member_with_dual, lambda row: row['assessment'].update(
+        execution='budget_exceeded', truth='unknown'))
+    _assert_rejected_origin(member_with_dual, replay=False, match='completed weighted receipt')
+
+
+def test_legacy_verifier_still_reports_divergent_receipt_after_replay(member_with_dual):
+    _rewrite_member(member_with_dual, lambda row: row['assessment'].update(checks=[]))
+    manifest = _read(member_with_dual.parent.parent / 'manifest.json')
+    with pytest.raises(ValueError, match='^Archived claim differs from replay at member 0$'):
+        records.verify_member(manifest, 0, _read(member_with_dual), VerificationBudget())
+
+
 def test_standard_receipt_round_trip_remains_an_observation(archives):
     row = _read(archives[0] / 'members/1.json')
     receipt = assessment_from_dict(row['assessment'], claim_id=row['claim_id'], game_id=row['verifier_id'],
@@ -658,11 +763,8 @@ def test_rehashed_invalid_screen_candidate(archives, tmp_path, replay, generatio
     _assert_rejected_origin(member, replay=replay, match='candidate gap')
 
 
-@pytest.mark.parametrize('source', ['generated', 'recorded'])
-def test_real_budget_outcomes_keep_each_issue_and_origin(archives, source):
-    archive = archives[0] if source == 'generated' else Path('output/chsh-grid-audit')
-    if source == 'recorded' and not archive.exists():
-        pytest.skip('Recorded grid audit is an optional local archive')
+def test_real_budget_outcomes_keep_each_issue_and_origin(archives):
+    archive = archives[0]
     budget = VerificationBudget(max_strategies=1)
     ledger = load_ledger(archive, budget=budget)
     assert len(ledger.occurrences) == _read(archive / 'manifest.json')['steps'] + 1

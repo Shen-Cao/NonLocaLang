@@ -79,7 +79,8 @@ def _screen(game, manifest, local, template=None):
             'candidate_gap': None if local is None else result.value - float(local)}
 
 
-def _check_screen(screen, manifest, local):
+def check_screen_shape(screen, manifest):
+    """Check archived screen fields without making a claim about the observed score."""
     if not isinstance(screen, dict) or 'status' not in screen:
         raise ValueError('Invalid numerical screen record')
     if not manifest['screen']:
@@ -95,6 +96,15 @@ def _check_screen(screen, manifest, local):
             or screen['solver_status'] not in ('optimal', 'optimal_inaccurate')
             or type(screen['value']) is not float or not isfinite(screen['value'])):
         raise ValueError('Invalid numerical screen value or solver metadata')
+    candidate = screen['candidate_gap']
+    if candidate is not None and (type(candidate) is not float or not isfinite(candidate)):
+        raise ValueError('Invalid numerical candidate gap')
+
+
+def _check_screen(screen, manifest, local):
+    check_screen_shape(screen, manifest)
+    if screen['status'] != 'completed':
+        return
     expected = None if local is None else screen['value'] - float(local)
     if canonical_json(screen['candidate_gap']) != canonical_json(expected):
         raise ValueError('Numerical candidate gap differs from the reported score and exact local value')
@@ -154,26 +164,29 @@ def validate_member_binding(manifest, k, record):
     body = {key: value for key, value in record.items() if key != 'member_id'}
     if record['member_id'] != _identifier(body):
         raise ValueError(f'Weighted CHSH member ID differs from content at {k}')
-    return p, game, binding
-
-
-def verify_member_assessment(manifest, k, record, budget) -> tuple[ClaimAssessment | None, dict]:
-    """Return the replayed assessment and review. A generation failure has only a review."""
-    p, game, binding = validate_member_binding(manifest, k, record)
     raw, error = record['evidence'], record['generation_error']
     if error is not None:
         if (not isinstance(error, dict) or set(error) != {'status', 'detail'}
                 or error['status'] != 'budget_exceeded' or not isinstance(error['detail'], str)
                 or raw != [] or record['assessment'] is not None):
             raise ValueError('Invalid generation failure record')
+    else:
+        expected = ['local_enumeration', 'quantum_strategy']
+        if p <= Fraction(1, 10) or p == 1:
+            expected.append('xor_dual')
+        if (not isinstance(raw, list) or len(raw) != len(expected)
+                or any(not isinstance(item, dict) or item.get('kind') != kind for item, kind in zip(raw, expected))):
+            raise ValueError('Unexpected raw evidence list for weighted CHSH member')
+    return game, binding
+
+
+def verify_member_assessment(manifest, k, record, budget) -> tuple[ClaimAssessment | None, dict]:
+    """Return the replayed assessment and review. A generation failure has only a review."""
+    game, binding = validate_member_binding(manifest, k, record)
+    raw, error = record['evidence'], record['generation_error']
+    if error is not None:
         _check_screen(record['screen'], manifest, None)
         return None, _review(binding, None, error, record['screen'])
-    expected = ['local_enumeration', 'quantum_strategy']
-    if p <= Fraction(1, 10) or p == 1:
-        expected.append('xor_dual')
-    if (not isinstance(raw, list) or len(raw) != len(expected)
-            or any(not isinstance(item, dict) or item.get('kind') != kind for item, kind in zip(raw, expected))):
-        raise ValueError('Unexpected raw evidence list for weighted CHSH member')
     if len(raw) > budget.max_artifacts:
         raise EvidenceError(ExecutionStatus.BUDGET_EXCEEDED, 'Replay exceeds max_artifacts')
     try:

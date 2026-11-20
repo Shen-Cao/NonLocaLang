@@ -1,4 +1,8 @@
-"""Cross-run questions about weighted CHSH games, with replayable evidence origins."""
+"""Cross-run evidence for the strict finite-quantum advantage over the local value.
+
+The weighted CHSH manifests fix the two unrestricted resource contracts and a
+zero gap threshold. A claim ID binds that query to the exact game verifier.
+"""
 
 from bisect import bisect_left
 from collections import Counter, defaultdict
@@ -9,9 +13,20 @@ from fractions import Fraction
 import json
 from math import isfinite
 from operator import attrgetter
+from os import PathLike
+from pathlib import Path
 
-from ..claims.types import ExecutionStatus, TruthStatus
-from ..core.scalar_wire import scalar_string
+from ..claims import evidence_from_dict
+from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus, TruthStatus, VerificationBudget
+from ..core.scalar_wire import parse_rational, scalar_string
+from . import _weighted_record
+from ._checkpoint import MANIFEST_BYTES, MEMBER_BYTES, load_checkpoint, prefix_size
+from .run_manifest import replay_budget, validate_manifest
+
+__all__ = [
+    'Ledger', 'Occurrence', 'QuestionRecord', 'QuestionStatus', 'RunArchive', 'VerifiedFact',
+    'join_occurrences', 'ledger_to_dict', 'ledger_to_json', 'load_ledger', 'question_to_dict',
+]
 
 
 class QuestionStatus(StrEnum):
@@ -191,32 +206,29 @@ def join_occurrences(
             raise ValueError(f'Duplicate run_id {run.run_id}')
         run_map[run.run_id] = run
 
-    by_claim = defaultdict(list)
-    by_origin = {}
+    by_claim = defaultdict(dict)
     for occurrence in sorted(occurrences, key=attrgetter('origin')):
-        if occurrence.origin in by_origin:
+        observed = by_claim[occurrence.claim_id]
+        if occurrence.origin in observed:
             raise ValueError(f'Duplicate occurrence at {occurrence.origin}')
         if run_map and occurrence.run_id not in run_map:
             raise ValueError(f'Unknown occurrence run_id {occurrence.run_id}')
-        by_origin[occurrence.origin] = occurrence
-        by_claim[occurrence.claim_id].append(occurrence)
+        observed[occurrence.origin] = occurrence
 
-    claim_facts = defaultdict(list)
-    seen = set()
+    claim_facts = defaultdict(dict)
     for fact in sorted(facts, key=attrgetter('origin')):
-        occurrence = by_origin.get(fact.origin)
-        if (occurrence is None or occurrence.claim_id != fact.claim_id
-                or occurrence.replay_execution != ExecutionStatus.COMPLETED):
+        occurrence = by_claim.get(fact.claim_id, {}).get(fact.origin)
+        if occurrence is None or occurrence.replay_execution != ExecutionStatus.COMPLETED:
             raise ValueError(f'Fact lacks a matching replayed occurrence at {fact.origin}')
-        if fact.origin in seen:
+        verified = claim_facts[fact.claim_id]
+        if fact.origin in verified:
             raise ValueError(f'Duplicate fact at {fact.origin}')
-        seen.add(fact.origin)
-        claim_facts[fact.claim_id].append(fact)
+        verified[fact.origin] = fact
 
     questions = []
     for claim_id in sorted(by_claim):
-        observed = tuple(by_claim[claim_id])
-        verified = tuple(claim_facts[claim_id])
+        observed = tuple(by_claim[claim_id].values())
+        verified = tuple(claim_facts[claim_id].values())
         verifier_ids = {o.verifier_id for o in observed} | {f.verifier_id for f in verified}
         status, reason, support, conflicts = _resolution(verifier_ids, verified)
         covered = {o.run_id for o in observed}
@@ -316,3 +328,174 @@ def ledger_to_dict(ledger: Ledger) -> dict:
 def ledger_to_json(ledger: Ledger) -> str:
     """Serialize canonical ledger JSON, rejecting non-finite numbers."""
     return json.dumps(ledger_to_dict(ledger), sort_keys=True, separators=(',', ':'), allow_nan=False)
+
+
+_ARCHIVE_ERRORS = (ValueError, OSError, TypeError, KeyError, IndexError, OverflowError)
+
+
+def _archive_error(error, location):
+    if isinstance(error, EvidenceError):
+        return EvidenceError(error.issue.code, f'{location}: {error}', error.issue.evidence_id)
+    return EvidenceError(ExecutionStatus.INVALID_EVIDENCE, f'{location}: {error}')
+
+
+def _read_manifest(directory):
+    location = f'archive {str(directory)!r}'
+    try:
+        if '..' in directory.parts:
+            raise ValueError('Parent traversal in archive directory')
+        if any(path.is_symlink() for path in (directory, *directory.parents)):
+            raise ValueError('Archive directory traverses a symlink')
+        manifest = load_checkpoint(directory / 'manifest.json', MANIFEST_BYTES)
+        if isinstance(manifest, dict) and isinstance(manifest.get('run_id'), str):
+            location = f"run_id={manifest['run_id']}"
+        manifest = validate_manifest(manifest)
+        for entry in sorted(directory.iterdir()):
+            if entry.name not in {'manifest.json', 'members'}:
+                raise ValueError(f'Unexpected archive entry {entry.name!r}')
+        return manifest
+    except _ARCHIVE_ERRORS as error:
+        raise _archive_error(error, location) from error
+
+
+def _member_count(members, steps):
+    if members.is_symlink():
+        raise ValueError('Expected a members directory, found a symlink')
+    try:
+        count = prefix_size(members, steps)
+    except ValueError as error:
+        if members.is_dir():
+            # Locate the grid position for a diagnostic only after prefix_size fails.
+            indices = set()
+            for entry in sorted(members.iterdir()):
+                if entry.suffix != '.json' or not entry.stem.isascii() or not entry.stem.isdecimal():
+                    continue
+                k = int(entry.stem)
+                if entry.name != f'{k}.json' or k > steps or entry.is_symlink() or not entry.is_file():
+                    raise ValueError(f'k={k}: {error}') from error
+                indices.add(k)
+            for k in range(max(indices, default=-1)):
+                if k not in indices:
+                    raise ValueError(f'k={k}: {error}') from error
+        raise
+    # The resumable writer can ignore temporary files. The ledger imports a
+    # recorded archive and requires every directory entry to be accounted for.
+    if members.is_dir():
+        names = {entry.name for entry in members.iterdir()}
+        extra = names.difference(f'{k}.json' for k in range(count))
+        if extra:
+            raise ValueError(f'Unexpected member checkpoint {min(extra)!r}')
+    return count
+
+
+def _archived_verdict(record):
+    if record['generation_error'] is not None:
+        return TruthStatus.UNKNOWN, ExecutionStatus(record['generation_error']['status'])
+    receipt = record['assessment']
+    if (not isinstance(receipt, dict) or set(receipt) != set(ClaimAssessment.__dataclass_fields__)
+            or receipt['schema'] != ClaimAssessment.schema
+            or receipt['claim_id'] != record['claim_id'] or receipt['game_id'] != record['verifier_id']):
+        raise ValueError('Invalid archived claim assessment fields, schema or binding')
+    truth, execution = TruthStatus(receipt['truth']), ExecutionStatus(receipt['execution'])
+    if execution != ExecutionStatus.COMPLETED and truth != TruthStatus.UNKNOWN:
+        raise ValueError('A non-completed archived assessment cannot carry a verdict')
+    return truth, execution
+
+
+def _replayed_scalar(value):
+    if value is None:
+        return None
+    # This canonical text was produced by the verifier from exact arithmetic.
+    # Products and differences can exceed the scalar limits on artifact inputs.
+    return parse_rational(value, canonical=True, max_chars=len(value), max_bits=4 * len(value))
+
+
+def _load_observation(manifest, k, record, limit):
+    result, review = None, None
+    if limit is None:
+        _weighted_record.validate_member_binding(manifest, k, record)
+        _weighted_record.check_screen_shape(record['screen'], manifest)
+        for raw in record['evidence']:
+            artifact = evidence_from_dict(raw, max_bytes=MEMBER_BYTES)
+            if artifact.game_id != record['verifier_id']:
+                raise ValueError('Archived evidence belongs to a different game verifier')
+    else:
+        result, review = _weighted_record.verify_member_assessment(manifest, k, record, limit)
+    truth, execution = _archived_verdict(record)
+    occurrence = Occurrence(
+        run_id=manifest['run_id'], member_id=record['member_id'], claim_id=record['claim_id'],
+        verifier_id=record['verifier_id'], k=k, p=parse_rational(record['p'], canonical=True),
+        archived_truth=truth, archived_execution=execution, screen_status=record['screen']['status'],
+        candidate_gap=record['screen'].get('candidate_gap'),
+        replay_execution=None if review is None else ExecutionStatus(review['execution']),
+    )
+    if result is None or result.execution != ExecutionStatus.COMPLETED:
+        return occurrence, None
+    fact = VerifiedFact(
+        run_id=manifest['run_id'], member_id=record['member_id'], claim_id=result.claim_id,
+        verifier_id=result.game_id, truth=result.truth, execution=result.execution,
+        local_value=_replayed_scalar(review['local_value']),
+        quantum_lower=_replayed_scalar(review['quantum_lower']),
+        quantum_upper=_replayed_scalar(review['quantum_upper']),
+        certified_gap_lower=_replayed_scalar(review['certified_gap_lower']),
+        verified_evidence=result.verified_evidence, numerical_hints=result.numerical_hints,
+        derivation=result.derivation,
+    )
+    return occurrence, fact
+
+
+def _read_member(directory, manifest, k, limit):
+    location = f"run_id={manifest['run_id']} k={k}"
+    try:
+        record = load_checkpoint(directory / 'members' / f'{k}.json', MEMBER_BYTES)
+        if isinstance(record, dict) and isinstance(record.get('member_id'), str):
+            location += f" member_id={record['member_id']}"
+        return _load_observation(manifest, k, record, limit)
+    except _ARCHIVE_ERRORS as error:
+        raise _archive_error(error, location) from error
+
+
+def load_ledger(
+    paths: Iterable[str | PathLike[str]] | str | PathLike[str],
+    replay: bool = True, budget: VerificationBudget | None = None,
+) -> Ledger:
+    """Load weighted CHSH archives and replay each observed member by default.
+
+    With replay disabled, check checkpoint identities, evidence envelopes and
+    receipt bindings, and keep the archived verdicts and screen observations.
+    Only completed verifier assessments supply facts. Each archive's recorded
+    verification limits bound the caller's budget. Read stable archive directories
+    with a complete manifest and zero or more consecutive member checkpoints.
+    """
+    if not isinstance(replay, bool):
+        raise TypeError('replay must be a Boolean')
+    if budget is not None and not isinstance(budget, VerificationBudget):
+        raise TypeError('Expected VerificationBudget for replay')
+    if isinstance(paths, (str, PathLike)):
+        paths = (paths,)
+    archives = {}
+    for path in paths:
+        directory = Path(path)
+        manifest = _read_manifest(directory)
+        run_id = manifest['run_id']
+        if run_id in archives:
+            raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, f'Duplicate run_id={run_id}')
+        archives[run_id] = (directory, manifest)
+
+    runs, occurrences, facts = [], [], []
+    for run_id, (directory, manifest) in sorted(archives.items()):
+        try:
+            count = _member_count(directory / 'members', manifest['steps'])
+        except _ARCHIVE_ERRORS as error:
+            raise _archive_error(error, f'run_id={run_id}') from error
+        runs.append(RunArchive(run_id, manifest['family'], manifest['schema'], manifest['steps'], count))
+        limit = replay_budget(manifest, budget) if replay else None
+        for k in range(count):
+            occurrence, fact = _read_member(directory, manifest, k, limit)
+            occurrences.append(occurrence)
+            if fact is not None:
+                facts.append(fact)
+    runs = tuple(runs)
+    occurrences = tuple(sorted(occurrences, key=attrgetter('origin')))
+    facts = tuple(sorted(facts, key=attrgetter('origin')))
+    return Ledger(runs, occurrences, facts, join_occurrences(occurrences, facts, runs))

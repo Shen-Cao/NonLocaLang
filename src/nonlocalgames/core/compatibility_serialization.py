@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from .compatibility_tasks import NetworkCompatibilityTask
-from .numeric_data import positive_budget
+from .json_file import read_json
 from .resource_serialization import resource_from_dict, resource_to_dict
 
 SCHEMA = "nonlocalgames.network_compatibility_task.v1"
@@ -32,10 +32,6 @@ def dump_compatibility(task, path):
 
 def load_compatibility(path, *, max_file_bytes=64_000_000, max_entries=1_000_000,
                        max_scalar_bits=4096, max_scalar_chars=8192):
-    positive_budget(max_file_bytes, 'max_file_bytes')
-    with Path(path).open('rb') as stream:
-        payload = stream.read(max_file_bytes + 1)
-    if len(payload) > max_file_bytes:
-        raise ValueError('Compatibility task exceeds max_file_bytes')
-    return compatibility_from_dict(json.loads(payload), max_entries=max_entries,
+    data = read_json(path, max_file_bytes=max_file_bytes, detect_encoding=True)
+    return compatibility_from_dict(data, max_entries=max_entries,
                                    max_scalar_bits=max_scalar_bits, max_scalar_chars=max_scalar_chars)

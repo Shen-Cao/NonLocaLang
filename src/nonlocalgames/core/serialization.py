@@ -3,7 +3,7 @@ import json
 from pathlib import Path
 
 from .game import Game, Scenario
-from .numeric_data import positive_budget
+from .json_file import read_json
 from .scalar_wire import parse_rational, scalar_string
 from .wire_validation import bounded_product
 
@@ -46,9 +46,4 @@ def dump(game, path):
 
 
 def load(path, *, max_file_bytes=64_000_000, **limits):
-    positive_budget(max_file_bytes, 'max_file_bytes')
-    with Path(path).open('rb') as stream:
-        payload = stream.read(max_file_bytes+1)
-    if len(payload) > max_file_bytes:
-        raise ValueError('Verifier JSON exceeds max_file_bytes')
-    return from_dict(json.loads(payload), **limits)
+    return from_dict(read_json(path, max_file_bytes=max_file_bytes, detect_encoding=True), **limits)

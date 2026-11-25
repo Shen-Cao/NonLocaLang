@@ -53,6 +53,26 @@ Game JSON readers also check scenario/table sizes before scalar conversion.
 `load` additionally bounds file bytes. The property CLI exposes
 `--max-scalar-bits` and `--max-scalar-chars` for game loading and nonquantum evidence.
 
+### Reading JSON files
+
+Use the file codecs for untrusted documents. They reject repeated names in
+any object (even equal values or different JSON escapes for the same name),
+and the nonstandard tokens `NaN`, `Infinity`, and `-Infinity`. This applies to
+the verifier, task and network-compatibility loaders and to every input file
+of the `claim` and `property` commands. A malformed file is an input error,
+not a mathematical verdict. A `from_dict` codec cannot detect names already
+discarded by another parser.
+
+File limits count original bytes before decoding. The three loaders and
+`property` default to 64,000,000 bytes per file and retain Python's JSON byte
+encoding detection (UTF-8 with or without BOM, UTF-16, or UTF-32). Use UTF-8
+without BOM for portability: `claim` and the discovery readers require it.
+`claim` defaults to 8,000,000 bytes per verifier, definition, or evidence file;
+its separate budget file is limited to 16,384 bytes. Neither the canonical
+representation nor the content IDs of valid records depend on file encoding.
+
+### Computational limits
+
 Direct trusted Python constructors retain unrestricted exact arithmetic. These
 wire limits bound supplied data, not every later product, Schur complement, hash,
 or execution time. Exact quantum arithmetic has additional intermediate scalar

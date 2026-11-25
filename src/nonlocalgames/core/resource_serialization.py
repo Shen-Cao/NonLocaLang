@@ -3,6 +3,7 @@ import json
 from math import prod
 from pathlib import Path
 
+from .json_file import read_json
 from .resources import AnalysisTask, ResourceSpec
 from .numeric_data import matrix_from_dict, positive_budget
 from .serialization import from_dict as game_from_dict, to_dict as game_to_dict
@@ -83,9 +84,5 @@ def dump_task(task, path):
 
 def load_task(path, *, max_file_bytes=64_000_000, **resource_limits):
     """Load bounded JSON and decode fixed-state matrices under explicit budgets."""
-    positive_budget(max_file_bytes, "max_file_bytes")
-    with Path(path).open("rb") as stream:
-        payload = stream.read(max_file_bytes + 1)
-    if len(payload) > max_file_bytes:
-        raise ValueError("Task JSON exceeds max_file_bytes")
-    return task_from_dict(json.loads(payload), **resource_limits)
+    data = read_json(path, max_file_bytes=max_file_bytes, detect_encoding=True)
+    return task_from_dict(data, **resource_limits)

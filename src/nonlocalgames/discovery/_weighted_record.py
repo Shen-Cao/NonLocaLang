@@ -1,20 +1,24 @@
 """Raw evidence, replayed gap claims, and numerical screens for one weighted CHSH member."""
 from fractions import Fraction
 from hashlib import sha256
-from math import isfinite
+from math import isfinite, prod
 
 from ..analysis import xor_quantum_value
 from ..certificates.quantum import QUANTUM_LOWER_SCHEMA
 from ..certificates.xor import XOR_DUAL_SCHEMA
-from ..claims import (EvidenceKind, GapClaim, assess_gap, assessment_to_dict, claim_id,
+from ..certificates.xor_model import xor_coefficients
+from ..claims import (EvidenceKind, GapClaim, VerificationBudget, assess_gap, assessment_to_dict, claim_id,
                       evidence_from_dict, evidence_to_dict)
 from ..claims.admission import bound_intervals
 from ..claims.serialization import assessment_from_dict
-from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus
+from ..claims.types import ClaimAssessment, EvidenceError, ExecutionStatus, TruthStatus
+from ..claims.verify import _quantum_policy
+from ..classical.strategy import response_tables
 from ..core.identity import JSONBudgetExceeded, VERIFIER_ID_PREFIX, canonical_json, verifier_id
 from ..core.resources import Resource, ResourceSpec
 from ..core.scalar_wire import parse_rational, scalar_string
 from ..games import biased_chsh
+from ..quantum.exact.serialization import STRATEGY_SCHEMA, matrix_from_dict
 from .weighted_chsh import weighted_chsh_member
 
 _SCHEMA = 'nonlocalgames.weighted_chsh_member.v1'
@@ -198,19 +202,63 @@ def _weighted_payload(artifact, fields, *, schema=None):
     return payload
 
 
-def _payload_rational(value, field):
+def admission_budget(manifest):
+    """Use the validated manifest's limits to read its archived observations."""
+    return VerificationBudget(**manifest['verification_budget'])
+
+
+def _payload_rational(value, field, *, budget):
     if not isinstance(value, str):
         raise ValueError(f'Weighted payload {field} must be a canonical rational string')
-    return parse_rational(value, canonical=True)
+    return parse_rational(value, canonical=True, max_bits=budget.max_wire_scalar_bits,
+                          max_chars=budget.max_wire_scalar_chars)
 
 
-def _validate_weighted_check(check, artifact):
-    """Bind the receipt to the witness declarations. Only replay verifies the witness."""
+def _validate_quantum_strategy(strategy, scenario, budget):
+    """Parse the state and effects under the archive limits. Feasibility is checked in replay."""
+    fields = {'schema', 'encoding', 'dimensions', 'state', 'measurements'}
+    if not isinstance(strategy, dict) or strategy.keys() != fields or strategy['schema'] != STRATEGY_SCHEMA:
+        raise ValueError('Invalid exact quantum strategy fields or schema')
+    if strategy['encoding'] != 'rational_complex':
+        raise ValueError('Exact quantum strategies require rational_complex encoding')
+    dimensions = strategy['dimensions']
+    if (not isinstance(dimensions, list) or len(dimensions) != scenario.parties
+            or any(type(d) is not int or d <= 0 for d in dimensions)):
+        raise ValueError('Weighted quantum_strategy payload dimensions must be two positive integers')
+
+    joint = prod(dimensions)
+    if joint > budget.max_joint_dimension:
+        raise ValueError('Quantum strategy exceeds max_joint_dimension')
+    parties = tuple(zip(dimensions, scenario.input_sizes, scenario.output_sizes))
+    entries = joint**2 + sum(inputs * outputs * d**2 for d, inputs, outputs in parties)
+    if entries > budget.max_matrix_entries:
+        raise ValueError('Quantum state and effects exceed max_matrix_entries')
+    measurements = strategy['measurements']
+    if not isinstance(measurements, list) or len(measurements) != scenario.parties:
+        raise ValueError('Quantum strategy requires measurements for each party')
+    matrix_from_dict(strategy['state'], joint, budget=budget)
+    for party, (dimension, inputs, outputs) in zip(measurements, parties):
+        if not isinstance(party, list) or len(party) != inputs:
+            raise ValueError('Quantum strategy requires one measurement per local input')
+        for povm in party:
+            if not isinstance(povm, list) or len(povm) != outputs:
+                raise ValueError('Quantum measurement requires one effect per local output')
+            for effect in povm:
+                matrix_from_dict(effect, dimension, budget=budget)
+
+
+def _validate_weighted_check(check, artifact, *, game, budget):
+    """Validate payload structure and archived check shape. Replay compares their results."""
     if artifact.kind == EvidenceKind.LOCAL_ENUMERATION:
         checker, resource = 'local_enumeration_replay.v1', Resource.LOCAL
         payload = _weighted_payload(artifact, {'strategy', 'value'})
-        value = _payload_rational(payload['value'], 'value')
-        valid_bounds = (value == check.lower == check.upper == check.attained_score
+        _payload_rational(payload['value'], 'value', budget=budget)
+        tables = payload['strategy']
+        if (not isinstance(tables, list) or len(tables) != game.scenario.parties
+                or any(not isinstance(t, list) or len(t) != n for t, n in zip(tables, game.scenario.input_sizes))):
+            raise ValueError('Local strategy requires response tables with one output per local input')
+        response_tables(game.scenario, tables)
+        valid_bounds = (check.lower is not None and check.lower == check.upper == check.attained_score
                         and check.actual_dimensions is None)
     elif artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
         checker, resource = 'rational_quantum_strategy.v1', Resource.QUANTUM_FINITE
@@ -218,16 +266,11 @@ def _validate_weighted_check(check, artifact):
                                     schema=QUANTUM_LOWER_SCHEMA)
         if payload['resource'] != resource.value:
             raise ValueError('Invalid quantum_strategy payload resource')
-        strategy = payload['strategy']
-        if not isinstance(strategy, dict):
-            raise ValueError('Weighted quantum_strategy payload strategy must be an object')
-        dimensions = strategy['dimensions']
-        if (not isinstance(dimensions, list) or len(dimensions) != 2
-                or any(type(d) is not int or d <= 0 for d in dimensions)):
-            raise ValueError('Weighted quantum_strategy payload dimensions must be two positive integers')
-        lower = _payload_rational(payload['lower_bound'], 'lower_bound')
-        valid_bounds = (lower == check.lower == check.attained_score and check.upper is None
-                        and tuple(dimensions) == check.actual_dimensions)
+        _payload_rational(payload['lower_bound'], 'lower_bound', budget=budget)
+        policy = _quantum_policy(game, budget, check.artifact_id)
+        _validate_quantum_strategy(payload['strategy'], game.scenario, policy)
+        valid_bounds = (check.lower is not None and check.lower == check.attained_score and check.upper is None
+                        and check.actual_dimensions is not None and len(check.actual_dimensions) == game.scenario.parties)
     elif artifact.kind == EvidenceKind.XOR_DUAL:
         checker, resource = 'rational_xor_dual.v1', Resource.QUANTUM_COMMUTING
         payload = _weighted_payload(artifact, {'schema', 'game_fingerprint', 'diagonal', 'upper_bound'},
@@ -236,10 +279,11 @@ def _validate_weighted_check(check, artifact):
         # The weighted CHSH Gram matrix has two inputs for each of two parties.
         if not isinstance(diagonal, list) or len(diagonal) != 4:
             raise ValueError('Weighted xor_dual payload diagonal must have four entries')
-        for entry in diagonal:
-            _payload_rational(entry, 'diagonal')
-        upper = _payload_rational(payload['upper_bound'], 'upper_bound')
-        valid_bounds = (check.lower is None and check.upper == upper
+        constant, _ = xor_coefficients(game, max_matrix_size=budget.max_matrix_size)
+        objective = sum((_payload_rational(entry, 'diagonal', budget=budget) for entry in diagonal), constant)
+        if objective != _payload_rational(payload['upper_bound'], 'upper_bound', budget=budget):
+            raise ValueError('XOR diagonal objective differs from its declared upper bound')
+        valid_bounds = (check.lower is None and check.upper is not None
                         and check.attained_score is None and check.actual_dimensions is None)
     else:
         raise ValueError(f'Unexpected weighted evidence kind {artifact.kind.value}')
@@ -251,11 +295,13 @@ def _validate_weighted_check(check, artifact):
         raise ValueError(f'Invalid bounds or dimensions for the {checker} check')
 
 
-def validate_observed_assessment(record, artifacts):
+def validate_observed_assessment(record, artifacts, *, game, budget):
     """Check the internal consistency of a weighted receipt. Proof still requires replay."""
     artifacts = tuple(artifacts)
     assessment = assessment_from_dict(record['assessment'], claim_id=record['claim_id'],
-                                      game_id=record['verifier_id'], artifacts=artifacts)
+                                      game_id=record['verifier_id'], artifacts=artifacts,
+                                      max_scalar_bits=budget.max_wire_scalar_bits,
+                                      max_scalar_chars=budget.max_wire_scalar_chars)
     if assessment.execution != ExecutionStatus.COMPLETED:
         raise ValueError('Expected a completed weighted receipt')
     if assessment.numerical_hints or assessment.issues:
@@ -271,7 +317,7 @@ def validate_observed_assessment(record, artifacts):
         artifact = by_id.pop(check.artifact_id, None)
         if artifact is None:
             raise ValueError(f'Duplicate weighted check for artifact {check.artifact_id}')
-        _validate_weighted_check(check, artifact)
+        _validate_weighted_check(check, artifact, game=game, budget=budget)
 
     intervals, rules = bound_intervals(assessment.checks)
     by_resource = {interval.resource: interval for interval in intervals}
@@ -282,6 +328,14 @@ def validate_observed_assessment(record, artifacts):
         raise ValueError('Weighted receipt derivation differs from the rules for its checks')
     if any(i.lower is not None and i.upper is not None and i.lower > i.upper for i in intervals):
         raise ValueError('Inconsistent bounds in completed weighted receipt intervals')
+    high, low = expected
+    truth = TruthStatus.UNKNOWN
+    if high.lower is not None and low.upper is not None and high.lower - low.upper > _CLAIM.threshold:
+        truth = TruthStatus.PROVED
+    elif high.upper is not None and low.lower is not None and high.upper - low.lower <= _CLAIM.threshold:
+        truth = TruthStatus.DISPROVED
+    if assessment.truth != truth:
+        raise ValueError('Archived truth differs from the strict gap verdict of its derived intervals')
 
 
 def verify_member_assessment(manifest, k, record, budget, *,
@@ -305,7 +359,7 @@ def verify_member_assessment(manifest, k, record, budget, *,
         # A returned failure cannot reproduce the archived verdict. Validate its
         # observation before replay so even a failed attempt has a bound origin.
         check_screen_shape(record['screen'], manifest)
-        validate_observed_assessment(record, artifacts)
+        validate_observed_assessment(record, artifacts, game=game, budget=admission_budget(manifest))
     result = assess_gap(game, _CLAIM, artifacts, budget=budget)
     if preserve_incomplete and result.execution != ExecutionStatus.COMPLETED:
         return result, _review(binding, result, None, record['screen'])

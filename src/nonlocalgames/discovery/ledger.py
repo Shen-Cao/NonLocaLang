@@ -459,11 +459,12 @@ def _replayed_scalar(value):
 def _load_observation(manifest, k, record, limit):
     result, review = None, None
     if limit is None:
-        _weighted_record.validate_member_binding(manifest, k, record)
+        game, _ = _weighted_record.validate_member_binding(manifest, k, record)
         if record['generation_error'] is None:
             _weighted_record.check_screen_shape(record['screen'], manifest)
-            artifacts = (evidence_from_dict(raw, max_bytes=MEMBER_BYTES) for raw in record['evidence'])
-            _weighted_record.validate_observed_assessment(record, artifacts)
+            budget = _weighted_record.admission_budget(manifest)
+            artifacts = (evidence_from_dict(raw, max_bytes=budget.max_artifact_bytes) for raw in record['evidence'])
+            _weighted_record.validate_observed_assessment(record, artifacts, game=game, budget=budget)
     else:
         result, review = _weighted_record.verify_member_assessment(
             manifest, k, record, limit, preserve_incomplete=True)

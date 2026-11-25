@@ -1,5 +1,6 @@
 from collections import Counter
 from contextlib import contextmanager
+from copy import deepcopy
 from dataclasses import replace
 from fractions import Fraction
 from hashlib import sha256
@@ -7,9 +8,11 @@ import json
 import os
 import shutil
 from types import SimpleNamespace
+from unittest.mock import patch
 
 import pytest
 
+from nonlocalgames.certificates.xor import verify_xor_dual
 from nonlocalgames.claims import VerificationBudget, assessment_to_dict, evidence_from_dict, evidence_to_dict
 from nonlocalgames.claims.serialization import assessment_from_dict
 from nonlocalgames.claims.types import ClaimAssessment, ClaimIssue, EvidenceError, ExecutionStatus, TruthStatus
@@ -22,6 +25,7 @@ from nonlocalgames.discovery.ledger import (
     question_to_dict,
 )
 from nonlocalgames.discovery.weighted_run import run_weighted_chsh
+from nonlocalgames.games import biased_chsh
 
 
 @pytest.fixture(scope='module')
@@ -393,19 +397,15 @@ def test_fast_load_checks_raw_evidence_envelopes(archives, tmp_path):
     assert all(x in str(caught.value) for x in (damaged['run_id'], 'k=1', damaged['member_id']))
 
 
-def test_rehashed_archived_verdict_fails_replay_with_member_context(archives, tmp_path):
-    path = shutil.copytree(archives[0], tmp_path / 'archive')
-    member = path / 'members/0.json'
-    _rewrite_member(member, lambda r: r['assessment'].update(truth='proved'))
-    forged = _read(member)
-    fast = load_ledger(path, replay=False).resolve(forged['claim_id'])
-    assert fast.occurrences[0].archived_truth == 'proved'
-    assert fast.status == 'unverified' and fast.facts == fast.verified_evidence == ()
-    with pytest.raises(EvidenceError) as caught:
-        load_ledger([path])
-    message = str(caught.value)
-    assert all(x in message for x in ('k=0', forged['run_id'], forged['member_id']))
-    assert 'replay' in message.lower()
+def test_archived_truth_must_agree_with_derived_gap(member_with_dual, reject_before_assess):
+    def flip(row):
+        receipt = row['assessment']
+        assert receipt['truth'] == 'disproved'
+        assert all(i['lower'] == i['upper'] == '1' for i in receipt['intervals'])
+        receipt['truth'] = 'proved'
+
+    _rewrite_member(member_with_dual, flip)
+    reject_before_assess(member_with_dual, 'truth differs from the strict gap verdict')
 
 
 def test_wire_values_are_exact_and_serialization_is_path_and_input_order_independent(archives):
@@ -630,8 +630,12 @@ def test_replay_validates_archived_observation_before_calling_assess_gap(archive
 
 @pytest.fixture
 def member_with_dual(archives, tmp_path):
-    archive = shutil.copytree(archives[0], tmp_path / 'archive')
-    return archive / 'members/0.json'
+    archive = tmp_path / 'archive'
+    (archive / 'members').mkdir(parents=True)
+    shutil.copyfile(archives[0] / 'manifest.json', archive / 'manifest.json')
+    member = archive / 'members/0.json'
+    shutil.copyfile(archives[0] / 'members/0.json', member)
+    return member
 
 
 def _replace_payload(row, index, payload):
@@ -660,6 +664,7 @@ def reject_before_assess(request, monkeypatch):
 
     def reject(member, match=None):
         error = _assert_rejected_origin(member, replay=replay, match=match, budget=budget)
+        assert error.issue.code == ExecutionStatus.INVALID_EVIDENCE
         return str(error.__cause__)
 
     return reject
@@ -689,39 +694,46 @@ def test_completed_receipt_requires_two_quantum_dimensions(member_with_dual, rej
     reject_before_assess(member_with_dual, 'quantum_strategy')
 
 
-def test_quantum_check_dimensions_must_match_payload(member_with_dual, reject_before_assess):
-    def corrupt(row):
-        assert row['evidence'][1]['payload']['strategy']['dimensions'] == [2, 2]
-        row['assessment']['checks'][1]['actual_dimensions'] = [2, 3]
-
-    _rewrite_member(member_with_dual, corrupt)
-    assert reject_before_assess(member_with_dual) == (
-        'Invalid bounds or dimensions for the rational_quantum_strategy.v1 check')
-
-
-@pytest.mark.parametrize('index', [0, 1, 2], ids=['local-value', 'quantum-lower', 'xor-upper'])
-def test_receipt_bound_must_match_payload_even_if_derived_intervals_agree(
-        member_with_dual, reject_before_assess, index):
+@pytest.mark.parametrize('change', ['quantum-dimensions', 'quantum-lower', 'local-value', 'xor-upper'])
+def test_only_completed_replay_compares_receipt_to_witness(member_with_dual, change):
     def corrupt(row):
         receipt = row['assessment']
-        check = receipt['checks'][index]
+        local_check, strategy, dual = receipt['checks']
         quantum, local = receipt['intervals']
-        field = ('value', 'lower_bound', 'upper_bound')[index]
-        assert row['evidence'][index]['payload'][field] == '1'
-        if index == 0:
-            check.update(lower='3/4', upper='3/4', attained_score='3/4')
-            quantum['lower_refs'].remove(check['artifact_id'])
-            local.update(lower='3/4', upper='3/4', upper_refs=[check['artifact_id']])
-        elif index == 1:
-            check.update(lower='3/4', attained_score='3/4')
-            quantum['lower_refs'].remove(check['artifact_id'])
+        if change == 'quantum-dimensions':
+            strategy['actual_dimensions'] = [2, 3]
+        elif change == 'quantum-lower':
+            strategy.update(lower='3/4', attained_score='3/4')
+            quantum['lower_refs'].remove(strategy['artifact_id'])
+        elif change == 'local-value':
+            local_check.update(lower='3/4', upper='3/4', attained_score='3/4')
+            quantum['lower_refs'].remove(local_check['artifact_id'])
+            local.update(lower='3/4', upper='3/4', upper_refs=[local_check['artifact_id']])
+            receipt['truth'] = 'proved'
         else:
-            check['upper'] = quantum['upper'] = '5/4'
-            local['upper_refs'].remove(check['artifact_id'])
+            dual['upper'] = quantum['upper'] = '5/4'
+            local['upper_refs'].remove(dual['artifact_id'])
+            receipt['truth'] = 'unknown'
 
     _rewrite_member(member_with_dual, corrupt)
-    checker = _read(member_with_dual)['assessment']['checks'][index]['checker']
-    assert reject_before_assess(member_with_dual) == f'Invalid bounds or dimensions for the {checker} check'
+    archive = member_with_dual.parent.parent
+    with patch.object(records, 'assess_gap', wraps=records.assess_gap) as assess:
+        fast = load_ledger(archive, replay=False)
+        occurrence, = fast.occurrences
+        assert occurrence.replay_execution is None
+        assert fast.facts == () and fast.questions[0].status == 'unverified'
+        assess.assert_not_called()
+
+        limited = load_ledger(archive, budget=VerificationBudget(max_strategies=1))
+        occurrence, = limited.occurrences
+        assert occurrence.replay_execution == 'budget_exceeded'
+        assert limited.facts == () and limited.questions[0].status == 'unverified'
+        assess.assert_called_once()
+
+        assess.reset_mock()
+        error = _assert_rejected_origin(member_with_dual, replay=True, match='Archived claim differs from replay')
+        assert error.issue.code == ExecutionStatus.INVALID_EVIDENCE
+        assess.assert_called_once()
 
 
 @pytest.mark.parametrize(('payload_dims', 'check_dims'), [
@@ -738,6 +750,111 @@ def test_quantum_payload_dimensions_require_two_positive_json_integers(
 
     _rewrite_member(member_with_dual, corrupt)
     reject_before_assess(member_with_dual, 'dimensions must be two positive integers')
+
+
+@pytest.mark.parametrize('tables', [
+    None, {'alice': [0, 0], 'bob': [0, 0]}, [[0, 0]], [[0], [0, 0]],
+    [[False, 0], [0, 0]], [[0, 2], [0, 0]],
+])
+def test_malformed_local_response_tables(member_with_dual, reject_before_assess, tables):
+    _rewrite_member(member_with_dual, lambda row: _replace_payload(
+        row, 0, {**row['evidence'][0]['payload'], 'strategy': tables}))
+    reject_before_assess(member_with_dual, '(?i)response tables')
+
+
+@pytest.mark.parametrize(('change', 'value', 'message'), [
+    ((), {'dimensions': [2, 2]}, 'fields or schema'),
+    (('schema',), 'foreign', 'fields or schema'), (('extra',), None, 'fields or schema'),
+    (('encoding',), 'float', 'encoding'), (('dimensions',), [2, 3], 'matrix shape'),
+    (('state',), {'real': []}, 'real and imag'), (('state', 'real', 0, 0), '2/2', 'canonical'),
+    (('measurements',), [], 'each party'), (('measurements', 0), [], 'per local input'),
+    (('measurements', 0, 0), [], 'per local output'),
+    (('measurements', 0, 0, 0, 'imag'), [[0]], 'matrix shape'),
+    (('measurements', 0, 0, 0, 'real', 0, 0), 0, 'canonical rational strings'),
+])
+def test_malformed_quantum_strategy(member_with_dual, reject_before_assess, change, value, message):
+    def corrupt(row):
+        payload = deepcopy(row['evidence'][1]['payload'])
+        if change:
+            _set_nested(payload['strategy'], change, value)
+        else:
+            payload['strategy'] = value
+        _replace_payload(row, 1, payload)
+        if change == ('dimensions',):
+            row['assessment']['checks'][1]['actual_dimensions'] = value
+
+    _rewrite_member(member_with_dual, corrupt)
+    reject_before_assess(member_with_dual, message)
+
+
+def test_xor_objective_must_equal_declared_upper(member_with_dual, reject_before_assess):
+    def corrupt(row):
+        payload = deepcopy(row['evidence'][2]['payload'])
+        payload['diagonal'][0] = '1/3'
+        assert verify_xor_dual(biased_chsh(0), payload['diagonal']).value == Fraction(7, 6)
+        assert payload['upper_bound'] == row['assessment']['checks'][2]['upper'] == '1'
+        _replace_payload(row, 2, payload)
+
+    _rewrite_member(member_with_dual, corrupt)
+    reject_before_assess(member_with_dual, 'objective differs from its declared upper bound')
+
+
+@pytest.mark.parametrize('kind', ['local', 'quantum', 'xor'])
+def test_structurally_valid_false_witness_is_only_an_observation(member_with_dual, kind):
+    def corrupt(row):
+        index = ('local', 'quantum', 'xor').index(kind)
+        payload = deepcopy(row['evidence'][index]['payload'])
+        if kind == 'local':
+            payload['strategy'] = [[0, 0], [1, 1]]
+        elif kind == 'quantum':
+            payload['strategy']['state']['real'][0][0] = '-1'
+        else:
+            # This diagonal has the declared objective and violates PSD.
+            payload['diagonal'] = ['-1/6', '5/12', '1/6', '1/12']
+        _replace_payload(row, index, payload)
+
+    _rewrite_member(member_with_dual, corrupt)
+    archive = member_with_dual.parent.parent
+    fast = load_ledger(archive, replay=False)
+    assert len(fast.occurrences) == 1 and fast.facts == ()
+    replayed = load_ledger(archive)
+    occurrence, = replayed.occurrences
+    assert occurrence.replay_execution == 'invalid_evidence'
+    assert replayed.facts == () and replayed.questions[0].status == 'unverified'
+
+
+def test_wide_xor_uses_archive_budget_for_admission_and_caller_budget_for_replay(tmp_path):
+    archive = tmp_path / 'wide'
+    budget = VerificationBudget(max_wire_scalar_bits=8192)
+    run_weighted_chsh(archive, steps=4, screen=False, verification_budget=budget, max_new=1)
+    game = biased_chsh(0)
+    delta = Fraction(1, 2**4100)
+
+    def widen(row):
+        diagonal = list(map(Fraction, row['evidence'][2]['payload']['diagonal']))
+        diagonal[0] += delta
+        # Both a payload component and the resulting receipt bound need over 4096 bits.
+        dual = verify_xor_dual(game, diagonal, max_scalar_bits=budget.max_wire_scalar_bits)
+        assert dual.value == 1 + delta and diagonal[0].denominator.bit_length() > 4096
+        _replace_payload(row, 2, dual.witness)
+        checked = records.assess_gap(game, records._CLAIM, tuple(map(evidence_from_dict, row['evidence'])),
+                                     budget=budget)
+        assert checked.execution == 'completed'
+        row['assessment'] = assessment_to_dict(checked)
+
+    _rewrite_member(archive / 'members/0.json', widen)
+    fast = load_ledger(archive, replay=False)
+    assert len(fast.occurrences) == 1 and fast.facts == () and fast.questions[0].status == 'unverified'
+    full = load_ledger(archive, budget=budget)
+    fact, = full.facts
+    assert fact.quantum_upper == 1 + delta and fact.truth == 'unknown'
+    for limit, artifact_index in ((VerificationBudget(), 2), (replace(budget, max_strategies=1), 0)):
+        limited = load_ledger(archive, budget=limit)
+        occurrence, = limited.occurrences
+        assert limited.facts == () and limited.questions[0].status == 'unverified'
+        issue, = occurrence.replay_issues
+        assert occurrence.replay_execution == issue.code == 'budget_exceeded'
+        assert issue.evidence_id == _read(archive / 'members/0.json')['evidence'][artifact_index]['artifact_id']
 
 
 @pytest.mark.parametrize(('index', 'field', 'value', 'message'), [
@@ -849,7 +966,6 @@ def test_completed_receipt_requires_derived_interval_and_rule_order(member_with_
 
 def test_completed_receipt_rejects_contradictory_derived_bounds(member_with_dual, reject_before_assess):
     def corrupt(row):
-        _replace_payload(row, 2, {**row['evidence'][2]['payload'], 'upper_bound': '1/2'})
         receipt = row['assessment']
         dual = receipt['checks'][2]
         dual['upper'] = '1/2'

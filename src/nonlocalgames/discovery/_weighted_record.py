@@ -16,7 +16,7 @@ from ..claims.verify import _quantum_policy
 from ..classical.strategy import response_tables
 from ..core.identity import JSONBudgetExceeded, VERIFIER_ID_PREFIX, canonical_json, verifier_id
 from ..core.resources import Resource, ResourceSpec
-from ..core.scalar_wire import parse_rational, scalar_string
+from ..core.scalar_wire import ScalarBudgetExceeded, parse_rational, scalar_bits, scalar_string
 from ..games import biased_chsh
 from ..quantum.exact.serialization import STRATEGY_SCHEMA, matrix_from_dict
 from .weighted_chsh import weighted_chsh_member
@@ -207,11 +207,15 @@ def admission_budget(manifest):
     return VerificationBudget(**manifest['verification_budget'])
 
 
-def _payload_rational(value, field, *, budget):
+def _quantum_scalar_chars(budget):
+    # A canonical fraction needs at most two bit-widths of digits, a sign and a slash.
+    return 2 * budget.max_quantum_scalar_bits + 2
+
+
+def _payload_rational(value, field, limits):
     if not isinstance(value, str):
         raise ValueError(f'Weighted payload {field} must be a canonical rational string')
-    return parse_rational(value, canonical=True, max_bits=budget.max_wire_scalar_bits,
-                          max_chars=budget.max_wire_scalar_chars)
+    return parse_rational(value, canonical=True, **limits)
 
 
 def _validate_quantum_strategy(strategy, scenario, budget):
@@ -247,12 +251,25 @@ def _validate_quantum_strategy(strategy, scenario, budget):
                 matrix_from_dict(effect, dimension, budget=budget)
 
 
-def _validate_weighted_check(check, artifact, *, game, budget):
+def _validate_weighted_check(check, artifact, raw_check, *, game, budget):
     """Validate payload structure and archived check shape. Replay compares their results."""
+    if artifact.kind == EvidenceKind.QUANTUM_STRATEGY:
+        bits, chars = budget.max_quantum_scalar_bits, _quantum_scalar_chars(budget)
+    else:
+        bits, chars = budget.max_wire_scalar_bits, budget.max_wire_scalar_chars
+    limits = dict(max_bits=bits, max_chars=chars)
+    # The receipt decoder already established that these strings are canonical.
+    for field in ('lower', 'upper', 'attained_score'):
+        value = getattr(check, field)
+        if value is not None:
+            if len(raw_check[field]) > chars:
+                raise ScalarBudgetExceeded(f'{artifact.kind.value} check {field} exceeds max_chars')
+            if scalar_bits(value) > bits:
+                raise ScalarBudgetExceeded(f'{artifact.kind.value} check {field} exceeds max_bits')
     if artifact.kind == EvidenceKind.LOCAL_ENUMERATION:
         checker, resource = 'local_enumeration_replay.v1', Resource.LOCAL
         payload = _weighted_payload(artifact, {'strategy', 'value'})
-        _payload_rational(payload['value'], 'value', budget=budget)
+        _payload_rational(payload['value'], 'value', limits)
         tables = payload['strategy']
         if (not isinstance(tables, list) or len(tables) != game.scenario.parties
                 or any(not isinstance(t, list) or len(t) != n for t, n in zip(tables, game.scenario.input_sizes))):
@@ -266,7 +283,7 @@ def _validate_weighted_check(check, artifact, *, game, budget):
                                     schema=QUANTUM_LOWER_SCHEMA)
         if payload['resource'] != resource.value:
             raise ValueError('Invalid quantum_strategy payload resource')
-        _payload_rational(payload['lower_bound'], 'lower_bound', budget=budget)
+        _payload_rational(payload['lower_bound'], 'lower_bound', limits)
         policy = _quantum_policy(game, budget, check.artifact_id)
         _validate_quantum_strategy(payload['strategy'], game.scenario, policy)
         valid_bounds = (check.lower is not None and check.lower == check.attained_score and check.upper is None
@@ -280,8 +297,8 @@ def _validate_weighted_check(check, artifact, *, game, budget):
         if not isinstance(diagonal, list) or len(diagonal) != 4:
             raise ValueError('Weighted xor_dual payload diagonal must have four entries')
         constant, _ = xor_coefficients(game, max_matrix_size=budget.max_matrix_size)
-        objective = sum((_payload_rational(entry, 'diagonal', budget=budget) for entry in diagonal), constant)
-        if objective != _payload_rational(payload['upper_bound'], 'upper_bound', budget=budget):
+        objective = sum((_payload_rational(entry, 'diagonal', limits) for entry in diagonal), constant)
+        if objective != _payload_rational(payload['upper_bound'], 'upper_bound', limits):
             raise ValueError('XOR diagonal objective differs from its declared upper bound')
         valid_bounds = (check.lower is None and check.upper is not None
                         and check.attained_score is None and check.actual_dimensions is None)
@@ -298,10 +315,11 @@ def _validate_weighted_check(check, artifact, *, game, budget):
 def validate_observed_assessment(record, artifacts, *, game, budget):
     """Check the internal consistency of a weighted receipt. Proof still requires replay."""
     artifacts = tuple(artifacts)
+    # An interval can inherit a bound from either a wire scalar or a quantum score.
     assessment = assessment_from_dict(record['assessment'], claim_id=record['claim_id'],
                                       game_id=record['verifier_id'], artifacts=artifacts,
-                                      max_scalar_bits=budget.max_wire_scalar_bits,
-                                      max_scalar_chars=budget.max_wire_scalar_chars)
+                                      max_scalar_bits=max(budget.max_wire_scalar_bits, budget.max_quantum_scalar_bits),
+                                      max_scalar_chars=max(budget.max_wire_scalar_chars, _quantum_scalar_chars(budget)))
     if assessment.execution != ExecutionStatus.COMPLETED:
         raise ValueError('Expected a completed weighted receipt')
     if assessment.numerical_hints or assessment.issues:
@@ -313,11 +331,11 @@ def validate_observed_assessment(record, artifacts, *, game, budget):
         raise ValueError('Weighted verified_evidence must name each member artifact exactly once')
     if len(assessment.checks) != len(artifacts):
         raise ValueError('Weighted checks must cover each member artifact exactly once')
-    for check in assessment.checks:
+    for check, raw_check in zip(assessment.checks, record['assessment']['checks'], strict=True):
         artifact = by_id.pop(check.artifact_id, None)
         if artifact is None:
             raise ValueError(f'Duplicate weighted check for artifact {check.artifact_id}')
-        _validate_weighted_check(check, artifact, game=game, budget=budget)
+        _validate_weighted_check(check, artifact, raw_check, game=game, budget=budget)
 
     intervals, rules = bound_intervals(assessment.checks)
     by_resource = {interval.resource: interval for interval in intervals}

@@ -857,6 +857,96 @@ def test_wide_xor_uses_archive_budget_for_admission_and_caller_budget_for_replay
         assert issue.evidence_id == _read(archive / 'members/0.json')['evidence'][artifact_index]['artifact_id']
 
 
+@pytest.fixture(scope='module')
+def narrow_wire_archive(tmp_path_factory):
+    archive = tmp_path_factory.mktemp('narrow-wire')
+    budget = VerificationBudget(max_wire_scalar_bits=8, max_wire_scalar_chars=6)
+    written = run_weighted_chsh(archive, verification_budget=budget, steps=20, max_new=4, screen=False)
+    assert written['execution'] == {'completed': 4}
+    return archive
+
+
+def test_writer_quantum_score_can_exceed_both_wire_limits(narrow_wire_archive):
+    member = _read(narrow_wire_archive / 'members/3.json')
+    text = member['evidence'][1]['payload']['lower_bound']
+    score = Fraction(text)
+    budget = _read(narrow_wire_archive / 'manifest.json')['verification_budget']
+    assert score == Fraction(385041947, 443760820)
+    assert score.numerator.bit_length() == score.denominator.bit_length() == 29
+    assert budget['max_wire_scalar_bits'] < 29 <= budget['max_quantum_scalar_bits']
+    assert len(text) > budget['max_wire_scalar_chars']
+
+    fast = load_ledger(narrow_wire_archive, replay=False)
+    limited = load_ledger(narrow_wire_archive, budget=VerificationBudget(max_strategies=1))
+    for ledger in (fast, limited):
+        assert len(ledger.occurrences) == 4 and ledger.facts == ()
+        assert ledger.summary['statuses']['unverified'] == 4
+    assert all(o.replay_execution is None for o in fast.occurrences)
+    assert all(o.replay_execution == 'budget_exceeded' for o in limited.occurrences)
+
+    full = load_ledger(narrow_wire_archive)
+    assert len(full.facts) == len(full.occurrences) == 4
+    assert {o.p: full.resolve(o.claim_id).status for o in full.occurrences} == {
+        Fraction(0): 'disproved', Fraction(1, 20): 'disproved',
+        Fraction(1, 10): 'disproved', Fraction(3, 20): 'proved',
+    }
+    fact, = full.resolve(member['claim_id']).facts
+    assert fact.quantum_lower == score and fact.member_id == member['member_id']
+
+    # A smaller caller quantum limit can stop replay of this specific member.
+    restricted = load_ledger(narrow_wire_archive, budget=VerificationBudget(max_quantum_scalar_bits=8))
+    question = restricted.resolve(member['claim_id'])
+    assert question.facts == () and question.occurrences[0].replay_execution == 'budget_exceeded'
+
+
+def _copy_with_scalar(archive, tmp_path, index, section, field, value):
+    member = shutil.copytree(archive, tmp_path / archive.name) / 'members/0.json'
+
+    def mutate(row):
+        if section == 'payload':
+            _replace_payload(row, index, {**row['evidence'][index]['payload'], field: value})
+        else:
+            row['assessment']['checks'][index][field] = value
+
+    _rewrite_member(member, mutate)
+    return member
+
+
+@pytest.mark.parametrize(('index', 'section', 'field', 'value', 'limit'), [
+    (0, 'payload', 'value', '256', 'max_bits'),
+    (0, 'check', 'lower', '256', 'max_bits'),
+    (0, 'check', 'upper', '128/129', 'max_chars'),
+    (0, 'check', 'attained_score', '256', 'max_bits'),
+    (2, 'payload', 'diagonal', ['128/129', '0', '0', '0'], 'max_chars'),
+    (2, 'payload', 'upper_bound', '256', 'max_bits'),
+    (2, 'check', 'upper', '128/129', 'max_chars'),
+    (1, 'payload', 'lower_bound', str(1 << 4096), 'max_bits'),
+    (1, 'check', 'lower', str(1 << 4096), 'max_bits'),
+])
+def test_narrow_wire_archive_enforces_scalar_limits(
+        narrow_wire_archive, tmp_path, reject_before_assess, index, section, field, value, limit):
+    member = _copy_with_scalar(narrow_wire_archive, tmp_path, index, section, field, value)
+    reject_before_assess(member, limit)
+
+
+@pytest.fixture(scope='module')
+def narrow_quantum_archive(tmp_path_factory):
+    archive = tmp_path_factory.mktemp('narrow-quantum')
+    budget = VerificationBudget(max_quantum_scalar_bits=8)
+    written = run_weighted_chsh(archive, verification_budget=budget, steps=20, max_new=1, screen=False)
+    assert written['execution'] == {'completed': 1}
+    return archive
+
+
+@pytest.mark.parametrize(('section', 'field'), [
+    ('payload', 'lower_bound'), ('check', 'lower'), ('check', 'attained_score'),
+])
+def test_wider_wire_budget_cannot_authorize_quantum_scalars(
+        narrow_quantum_archive, tmp_path, reject_before_assess, section, field):
+    member = _copy_with_scalar(narrow_quantum_archive, tmp_path, 1, section, field, '256')
+    reject_before_assess(member, 'max_bits')
+
+
 @pytest.mark.parametrize(('index', 'field', 'value', 'message'), [
     (0, 'value', 1, 'rational string'), (0, 'value', '2/2', 'canonical rational string'),
     (1, 'lower_bound', 1, 'rational string'), (1, 'lower_bound', '1.0', 'canonical rational string'),

@@ -1,9 +1,9 @@
 """Inspect precise verifier properties and rechecked attainment claims."""
 import argparse
 import json
-from pathlib import Path
 
 from .claims import VerificationBudget, evidence_from_dict
+from .core.json_file import read_json
 from .core.numeric_data import positive_budget
 from .core.resource_serialization import resource_from_dict
 from .core.resources import ResourceSpec
@@ -12,15 +12,6 @@ from .games import GAMES
 from .properties import (PropertyClaim, PropertyKind, assess_property,
                          property_assessment_to_dict, property_claim_to_dict)
 from .properties.types import STRUCTURAL_KINDS
-
-
-def _load(path, limit):
-    positive_budget(limit, 'max_file_bytes')
-    with Path(path).open('rb') as stream:
-        data = stream.read(limit+1)
-    if len(data) > limit:
-        raise ValueError('Input JSON exceeds max_file_bytes')
-    return json.loads(data)
 
 
 def main(argv=None):
@@ -53,7 +44,8 @@ def main(argv=None):
                                      max_artifacts=args.max_artifacts,
                                      max_wire_scalar_bits=args.max_scalar_bits,
                                      max_wire_scalar_chars=args.max_scalar_chars)
-        game = (game_from_dict(_load(args.file, args.max_file_bytes),
+        file_options = {'max_file_bytes': args.max_file_bytes, 'detect_encoding': True}
+        game = (game_from_dict(read_json(args.file, **file_options),
                               max_entries=args.max_property_entries,
                               max_scalar_bits=args.max_scalar_bits,
                               max_scalar_chars=args.max_scalar_chars)
@@ -62,11 +54,11 @@ def main(argv=None):
         if args.resource is not None:
             resource = ResourceSpec(args.resource)
         elif args.resource_file is not None:
-            resource = resource_from_dict(_load(args.resource_file, args.max_file_bytes))
+            resource = resource_from_dict(read_json(args.resource_file, **file_options))
         claim = PropertyClaim(args.kind, resource, off_support=args.off_support)
         artifacts = ()
         if args.evidence is not None:
-            data = _load(args.evidence, args.max_file_bytes)
+            data = read_json(args.evidence, **file_options)
             if not isinstance(data, list):
                 raise ValueError('Evidence file must be a list of raw artifact envelopes')
             if len(data) > budget.max_artifacts:

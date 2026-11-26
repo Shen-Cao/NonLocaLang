@@ -2,11 +2,11 @@
 from dataclasses import InitVar, dataclass
 from enum import StrEnum
 import hashlib
-import json
 from numbers import Integral
 
 from ..core.identity import (JSONBudgetExceeded, RESOURCE_ID_PREFIX, VERIFIER_ID_PREFIX,
                              canonical_json, verifier_id)
+from ..core.json_file import decode_json
 
 EVIDENCE_SCHEMA = "nonlocalgames.evidence.v1"
 ARTIFACT_ID_PREFIX = EVIDENCE_SCHEMA + ":"
@@ -35,24 +35,6 @@ def _identifier(value, prefix):
     digest = value[len(prefix):]
     if len(digest) != 64 or any(c not in "0123456789abcdef" for c in digest):
         raise ValueError("Evidence identifiers require lowercase SHA256 digests")
-
-
-def _pairs(pairs):
-    result = {}
-    for key, value in pairs:
-        if key in result:
-            raise ValueError("Duplicate JSON object fields are not canonical evidence")
-        result[key] = value
-    return result
-
-
-def _load(text):
-    if not isinstance(text, str):
-        raise TypeError("Evidence resource_json and payload_json must be JSON strings")
-    try:
-        return json.loads(text, object_pairs_hook=_pairs)
-    except RecursionError as error:
-        raise ValueError("JSON nesting exceeds evidence decoding limits") from error
 
 
 def _resource_digest(resource_json):
@@ -86,7 +68,7 @@ class EvidenceArtifact:
             raise TypeError("Evidence resource_json and payload_json must be JSON strings")
         if len(self.resource_json.encode("utf-8")) + len(self.payload_json.encode("utf-8")) > limit:
             raise JSONBudgetExceeded("Evidence JSON exceeds max_bytes")
-        raw_resource, raw_payload = _load(self.resource_json), _load(self.payload_json)
+        raw_resource, raw_payload = decode_json(self.resource_json), decode_json(self.payload_json)
         resource_json = canonical_json(raw_resource, max_bytes=limit)
         payload_json = canonical_json(raw_payload, max_bytes=limit)
         object.__setattr__(self, "resource_json", resource_json)
@@ -100,17 +82,17 @@ class EvidenceArtifact:
 
     def _body(self):
         return {"schema": EVIDENCE_SCHEMA, "kind": self.kind.value, "game_id": self.game_id,
-                "resource": _load(self.resource_json), "resource_id": self.resource_id,
-                "payload": _load(self.payload_json)}
+                "resource": decode_json(self.resource_json), "resource_id": self.resource_id,
+                "payload": decode_json(self.payload_json)}
 
     @property
     def resource(self):
         from ..core.resource_serialization import resource_from_dict
-        return resource_from_dict(_load(self.resource_json))
+        return resource_from_dict(decode_json(self.resource_json))
 
     @property
     def payload(self):
-        return _load(self.payload_json)
+        return decode_json(self.payload_json)
 
     @property
     def resource_id(self):

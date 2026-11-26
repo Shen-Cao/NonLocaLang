@@ -1,10 +1,10 @@
 """Admission of data artifacts through specific independently replayed checks."""
-import json
 from math import prod
 
 from ..core.scalar_wire import ScalarBudgetExceeded, parse_rational
 from ..core.wire_validation import validate_game_numbers
 from ..core.identity import canonical_json, verifier_id
+from ..core.json_file import decode_json
 from ..core.resources import Resource, ResourceSpec
 from .artifacts import EvidenceArtifact, EvidenceKind
 from .types import EvidenceCheck, EvidenceError, ExecutionStatus, VerificationBudget
@@ -54,7 +54,7 @@ def verify_artifact(game, artifact, *, budget=None):
     if artifact.game_id != verifier_id(game):
         raise EvidenceError(ExecutionStatus.INVALID_EVIDENCE, 'Evidence belongs to a different verifier', identifier)
     try:
-        source = json.loads(artifact.resource_json)
+        source = decode_json(artifact.resource_json)
         resource = ResourceSpec(Resource(source['kind']))
         payload = artifact.payload
         if artifact.kind == EvidenceKind.NUMERICAL_HINT:

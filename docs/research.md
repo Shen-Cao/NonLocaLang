@@ -7,8 +7,9 @@ The executable fragments cover finite, classical-interface, one-round games,
 composable state/measurement restrictions, and explicit independent-source
 network witnesses. See [resource contracts](resources.md) for supported analysis
 methods. The separate [two-round replay](interactive-replay.md) checks one supplied
-strategy with a quantum question and an adaptive classical follow-up. Broader
-typed causal interfaces and general sequential optimization remain research goals.
+strategy with a quantum question and an adaptive classical follow-up that can
+deliver a second, initially prepared register. Broader typed causal interfaces
+and general sequential optimization remain research goals.
 
 ## Results established in the report
 

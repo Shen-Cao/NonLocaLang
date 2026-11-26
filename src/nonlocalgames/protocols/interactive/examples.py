@@ -13,9 +13,9 @@ def _x_effects():
     return tuple(scale(RationalMatrix(((1, s), (s, 1))), Fraction(1, 2)) for s in (1, -1))
 
 
-def _output_bit(bit, dimension):
+def _output_label(label, dimension, size=2):
     ident = identity(dimension)
-    return tuple(scale(ident, int(z == bit)) for z in range(2))
+    return tuple(scale(ident, int(z == label)) for z in range(size))
 
 
 def sign_discrimination(*, reveal=False, dephase=False):
@@ -27,10 +27,10 @@ def sign_discrimination(*, reveal=False, dephase=False):
         off = 0 if dephase else 2*s
         state = scale(RationalMatrix(((4, off), (off, 1))), Fraction(1, 5))
         x = bit if reveal else 0  # revealing *changes the verifier*
-        cases.append(PrivateCase(Fraction(1, 2), x, state, (Continuation(0, _output_bit(bit, 1)),)))
+        cases.append(PrivateCase(Fraction(1, 2), x, state, (Continuation(0, _output_label(bit, 1)),)))
     for x in range(2 if reveal else 1):
         first.append(FirstMove(x, ((KrausTerm(1, identity(2)),),)))
-        effects = _output_bit(x, 2) if reveal else _x_effects()
+        effects = _output_label(x, 2) if reveal else _x_effects()
         final.append(FinalMove(LocalHistory(x, 0, 0), effects))
     return TwoRoundProtocol(1, 2, tuple(cases)), LocalStrategy(tuple(first), tuple(final))
 
@@ -72,7 +72,7 @@ def delayed_basis(*, keep_qubit=True):
     cases = []
     for basis in range(2):
         for bit in range(2):
-            cont = Continuation(basis, _output_bit(bit, 1))
+            cont = Continuation(basis, _output_label(bit, 1))
             cases.append(PrivateCase(Fraction(1, 4), 0, _basis_state(basis, bit), (cont, cont)))
     if keep_qubit:
         outcomes = ((KrausTerm(1, identity(2)),), ())  # explicit zero CP map for answer 1
@@ -80,6 +80,36 @@ def delayed_basis(*, keep_qubit=True):
         outcomes = tuple((KrausTerm(1, RationalMatrix(((1-y, y), (0, 0)))),) for y in range(2))
     final = tuple(FinalMove(LocalHistory(0, y, basis),
                             tuple(_basis_state(basis, z) for z in range(2))
-                            if keep_qubit else _output_bit(y, 2))
+                            if keep_qubit else _output_label(y, 2))
                   for y in range(2) for basis in range(2))
     return (TwoRoundProtocol(1, 2, tuple(cases)), LocalStrategy((FirstMove(0, outcomes),), final))
+
+
+def split_bell_label(memory="retain", *, independent=False):
+    """Send the halves of a private Bell state on opposite sides of a fixed acknowledgement.
+
+    Dephasing keeps a Z bit; resetting discards it. The independent control changes
+    the verifier by replacing each Bell preparation with the product of its marginals.
+    """
+    if type(independent) is not bool:
+        raise TypeError("independent must be a boolean")
+    if memory == "retain":
+        operators = (identity(2),)
+    elif memory == "dephase":
+        operators = (RationalMatrix(((1, 0), (0, 0))), RationalMatrix(((0, 0), (0, 1))))
+    elif memory == "reset":
+        operators = (RationalMatrix(((1, 0), (0, 0))), RationalMatrix(((0, 1), (0, 0))))
+    else:
+        raise ValueError("memory must be retain, dephase, or reset")
+
+    # Φ+, Φ−, Ψ+, Ψ− in Q2 ⊗ Q1 order. Only their projectors must be rational.
+    kets = ((1, 0, 0, 1), (1, 0, 0, -1), (0, 1, 1, 0), (0, 1, -1, 0))
+    bells = tuple(scale(RationalMatrix(tuple(tuple(a*b for b in ket) for a in ket)),
+                        Fraction(1, 2)) for ket in kets)
+    states = (scale(identity(4), Fraction(1, 4)),)*4 if independent else bells
+    cases = tuple(PrivateCase(Fraction(1, 4), 0, rho,
+                              (Continuation(0, _output_label(label, 1, 4)),))
+                  for label, rho in enumerate(states))
+    protocol = TwoRoundProtocol(1, 2, cases, second_message_dimension=2)
+    ack = FirstMove(0, (tuple(KrausTerm(1, op) for op in operators),))
+    return protocol, LocalStrategy((ack,), (FinalMove(LocalHistory(0, 0, 0), bells),))

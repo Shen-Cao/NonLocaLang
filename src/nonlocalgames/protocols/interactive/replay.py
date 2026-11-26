@@ -10,7 +10,7 @@ from ._plan import prepare
 from .model import LocalHistory, LocalStrategy, ReplayLimits, ReplayResult, Transcript, TwoRoundProtocol
 
 
-def _check_physics(cases, first, final, ir, iq, b):
+def _check_physics(cases, first, final, ir, iq1, ilocal, b):
     for _, case in cases:
         if case.state.trace(budget=b) != (1, 0):
             raise ValueError("Verifier's joint preparation must have trace one")
@@ -20,30 +20,33 @@ def _check_physics(cases, first, final, ir, iq, b):
                 verify_psd_complex(effect, budget=b)
                 verify_psd_complex(subtract(ir, effect, budget=b), budget=b)
 
-    zero = scale(iq, 0, budget=b)
+    zero = scale(iq1, 0, budget=b)
     for outcomes in first.values():
         total = zero
         for terms in outcomes:
             for w, k in terms:
                 gram = multiply(adjoint(k, budget=b), k, budget=b)
                 total = add(total, scale(gram, w, budget=b), budget=b)
-        if total != iq:
+        if total != iq1:
             raise ValueError("First instrument must be trace preserving when summed over outcomes")
+    if ilocal is not iq1:
+        zero = scale(ilocal, 0, budget=b)
     for effects in final.values():
         total = zero
         for effect in effects:
             verify_psd_complex(effect, budget=b)
             total = add(total, effect, budget=b)
-        if total != iq:
+        if total != ilocal:
             raise ValueError("Final POVM effects must sum to identity")
 
 
-def _branch(state, terms, ir, zero, b):
-    # Unnormalized joint state of R and memory, conditional on this instrument
-    # outcome. No division by its trace, so impossible outcomes remain well-defined.
+def _branch(state, terms, i_untouched, zero, b):
+    # The instrument acts only on Q1. Keep the subnormalized R_keep ⊗ Q2 ⊗ M
+    # state, even on impossible outcomes. Transferring Q2 changes ownership,
+    # not the state or its tensor order.
     result = zero
     for w, k in terms:
-        lifted = kron(ir, k, budget=b)
+        lifted = kron(i_untouched, k, budget=b)
         evolved = multiply(multiply(lifted, state, budget=b), adjoint(lifted, budget=b), budget=b)
         result = add(result, scale(evolved, w, budget=b), budget=b)
     return result
@@ -62,18 +65,21 @@ def replay(protocol: TwoRoundProtocol, strategy: LocalStrategy, *,
 
     No strategy callback runs. A delivered classical question selects the first
     instrument; only LocalHistory selects the final POVM. The unnormalized maps
-    act locally on the quantum message and preserve correlations with the reference.
+    act only on Q1, preserving correlations with the later wire Q2 and the
+    verifier reference. The final POVM acts on Q2 ⊗ M, never on the reference.
     """
-    r, q, cases, first, final = prepare(protocol, strategy, limits)
+    (r, q2, q1), cases, first, final = prepare(protocol, strategy, limits)
     b = limits.exact
-    ir, iq = identity(r, budget=b), identity(q, budget=b)
-    _check_physics(cases, first, final, ir, iq, b)
-    zero = scale(identity(r*q, budget=b), 0, budget=b)
+    ir, iq1 = identity(r, budget=b), identity(q1, budget=b)
+    ilocal = iq1 if q2 == 1 else identity(q2*q1, budget=b)
+    _check_physics(cases, first, final, ir, iq1, ilocal, b)
+    i_untouched = ir if q2 == 1 else identity(r*q2, budget=b)
+    zero = scale(identity(r*q2*q1, budget=b), 0, budget=b)
     transcripts = []
     total = score = Fraction(0)
     for index, (prior, case) in enumerate(cases):
         for y, terms in enumerate(first[case.question]):
-            state = _branch(case.state, terms, ir, zero, b)
+            state = _branch(case.state, terms, i_untouched, zero, b)
             cont = case.after_first[y]  # private verifier acts only after y
             h = LocalHistory(case.question, y, cont.question)
             for z, (povm, accept) in enumerate(zip(final[h], cont.accept, strict=True)):

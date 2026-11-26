@@ -56,8 +56,11 @@ def prepare(protocol, strategy, limits):
         raise TypeError("Expected ReplayLimits")
     b = limits.exact
     r = bounded_dimension(protocol.reference_dimension, b)
-    q = bounded_dimension(protocol.message_dimension, b)
-    d = bounded_dimension(r*q, b)
+    q1 = bounded_dimension(protocol.message_dimension, b)
+    q2 = bounded_dimension(protocol.second_message_dimension, b)
+    local = q2*q1  # final measurement acts on Q2 ⊗ M
+    d = bounded_dimension(r*local, b)
+    # The preparation is the largest PSD input; reference and final effects fit too.
     _bounded(2*d, b.max_psd_size, "max_psd_size")
     meter = _Meter(limits)
     first, final, cases = {}, {}, []
@@ -82,8 +85,8 @@ def prepare(protocol, strategy, limits):
                 w = exact_scalar(term.weight, max_bits=b.max_scalar_bits)
                 if w < 0:
                     raise ValueError("Kraus weights must be nonnegative")
-                meter.matrix(term.operator, q)
-                meter.charge(q**3 + 3*q*q)  # K†K and accumulate completeness
+                meter.matrix(term.operator, q1)
+                meter.charge(q1**3 + 3*q1*q1)  # K†K and accumulate completeness
                 terms.append((w, term.operator))
             resolved.append(tuple(terms))
         first[x] = tuple(resolved)
@@ -99,8 +102,8 @@ def prepare(protocol, strategy, limits):
         nfinal += len(effects)
         _bounded(nfinal, b.max_events, "final POVM outcomes")
         for effect in effects:
-            meter.matrix(effect, q)
-            meter.charge((2*q)**3 + q*q)  # realified PSD and completeness
+            meter.matrix(effect, local)
+            meter.charge((2*local)**3 + local*local)  # realified PSD and completeness
         final[h] = effects
 
     used_first, used_final = set(), set()
@@ -139,4 +142,4 @@ def prepare(protocol, strategy, limits):
         raise ValueError("Private case probabilities must sum to one")
     if set(first) != used_first or set(final) != used_final:
         raise ValueError("Strategy must have exactly the declared local views; found unused moves")
-    return r, q, cases, first, final
+    return (r, q2, q1), cases, first, final

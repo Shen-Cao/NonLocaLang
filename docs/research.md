@@ -6,8 +6,9 @@ resources, analysis question, and optional target realizations/equivalences.
 The executable fragments cover finite, classical-interface, one-round games,
 composable state/measurement restrictions, and explicit independent-source
 network witnesses. See [resource contracts](resources.md) for supported analysis
-methods. A broader typed causal extension remains a design rather than an
-implemented sequential or quantum-interface backend.
+methods. The separate [two-round replay](interactive-replay.md) checks one supplied
+strategy with a quantum question and an adaptive classical follow-up. Broader
+typed causal interfaces and general sequential optimization remain research goals.
 
 ## Results established in the report
 

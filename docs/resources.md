@@ -144,10 +144,15 @@ serialization, nonlinear checks, and the exact no-input bilocal fragment.
 ## Further backends
 
 The current extension provides explicit source witnesses, bilocal and triangle
-inequalities, source-disjoint marginal tests, and exact no-input chain reconstruction. General source-network optimization, inflation adapters, dimension-aware
-outer relaxations, separability and entanglement-depth restrictions, trusted quantum
-interfaces, and sequential instruments remain future capabilities. Relevant primary
-sources are [dimension-constrained relaxations](https://arxiv.org/abs/1412.0924),
+inequalities, source-disjoint marginal tests, and exact no-input chain reconstruction.
+General source-network optimization, inflation adapters, dimension-aware outer
+relaxations, and separability and entanglement-depth restrictions remain future
+capabilities. A separate [two-round replay](interactive-replay.md) checks a supplied
+strategy with a trusted quantum question and a sequential instrument; it is not
+an `AnalysisTask` backend or a general optimizer for those interfaces.
+
+Relevant primary sources are
+[dimension-constrained relaxations](https://arxiv.org/abs/1412.0924),
 [the PPT criterion](https://arxiv.org/abs/quant-ph/9604005),
 [its low-dimensional converse](https://arxiv.org/abs/quant-ph/9605038), and
 [bilocal correlations](https://arxiv.org/abs/1112.4502).

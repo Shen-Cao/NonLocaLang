@@ -12,8 +12,9 @@ strength of each analysis result explicit.
 The working core covers finite, one-round games with classical inputs and outputs,
 composable quantum resource restrictions, and explicit independent-source networks.
 The [theoretical report](report/main.tex) develops the representation and proof
-contracts. Trusted quantum interfaces, sequential protocols, and general network
-optimization remain research extensions.
+contracts. A [bounded two-round replay](docs/interactive-replay.md) checks one supplied
+strategy with a trusted quantum question and a later classical question. General
+sequential protocols and general network optimization remain research extensions.
 
 ## Quick start
 

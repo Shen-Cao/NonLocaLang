@@ -30,9 +30,11 @@ The coefficient lowering C[x,a] = mu[x] V[x,a] preserves every linear score. Kee
 mu and V as well retains experimental sampling, event semantics, and promise data.
 Input-dependent output alphabets require padding plus a proof that extra outputs do
 not change the resource-restricted optimum; arbitrary finite output sizes are not
-silently identified. Independent sources and dimension limits are explicit resource constraints. Causal
-rounds, quantum questions, referee systems, and postselection denominators require
-additional dialects. Flattening their visible probabilities alone loses constraints.
+silently identified. Independent sources and dimension limits are explicit
+resource constraints. Causal rounds, quantum questions, referee systems, and
+postselection denominators are not encoded by ordinary `Game` tables. The
+separate [two-round replay](interactive-replay.md) keeps the local history and
+quantum reference explicit rather than flattening a protocol to one round.
 
 ```mermaid
 flowchart LR

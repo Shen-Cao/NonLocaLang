@@ -42,9 +42,10 @@ for each reported proof.
 The [dimension-bounded threshold rule](claims.md#dimension-bounded-thresholds) uses an attained finite-dimensional score
 when the verified witness fits every dimension bound and satisfies all other target
 restrictions. Value reductions for product or particular PPT contracts need
-separate proofs. Broader NPA, quantum inflation,
-and trusted/sequential interfaces are selected when a discovery experiment requires
-them; their existence is not itself a reason to expand the dependency set.
+separate proofs. The [two-round replay](interactive-replay.md) checks a bounded
+trusted-interface strategy without a new dependency. Broader NPA, quantum
+inflation, and additional trusted/sequential interfaces are selected when a
+discovery experiment requires them.
 
 ## Mathematical verdicts
 

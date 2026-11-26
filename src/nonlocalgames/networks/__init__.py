@@ -17,8 +17,12 @@ from .compatibility import (CompatibilityResult, CompatibilityViolation, check_s
 from .compatibility_certificates import (verify_compatibility_violation, violation_from_dict,
                                          violation_to_dict)
 from .membership import BilocalMembershipResult, reconstruct_bilocal_chain
+from .rgb4 import (RGB4_NETWORK, RGB4_SCENARIO, rgb4_behavior, rgb4_dephased_strategy,
+                   rgb4_token_counting_margin)
 
 __all__ += ["RationalBehavior", "behavior_to_dict", "behavior_from_dict", "CompatibilityResult",
             "CompatibilityViolation", "check_source_independence", "source_disjoint_pairs",
             "triangle_finner", "verify_compatibility_violation", "violation_to_dict",
-            "violation_from_dict", "BilocalMembershipResult", "reconstruct_bilocal_chain"]
+            "violation_from_dict", "BilocalMembershipResult", "reconstruct_bilocal_chain",
+            "RGB4_NETWORK", "RGB4_SCENARIO", "rgb4_behavior", "rgb4_dephased_strategy",
+            "rgb4_token_counting_margin"]

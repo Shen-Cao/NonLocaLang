@@ -70,6 +70,7 @@ probabilities and payoffs require explicit conversion, so rounding is never hidd
 | Restricted quantum search | Multipartite dimensions, fixed/PPT states; POVMs or binary projectors | Seeded heuristic; restrictions rechecked on witnesses |
 | Fixed-measurement state optimization | Any party count; optional PPT cuts | Numerical state-block optimum and repaired witness |
 | Independent-source networks | Exact classical / numerical quantum source factorization | Constructive witnesses and tensor-order checks |
+| [Static RGB4 triangle](docs/rgb4.md) | One rational four-outcome, no-input benchmark | Exact quantum table, dephased classical control, and a classical exclusion conditional on token-counting rigidity |
 | Network compatibility | Source-disjoint marginals, triangle Finner, bilocal inequality | Exact rational necessary tests; passing is generally inconclusive |
 | Classical spiral inflation | No-input triangle, finite outputs | Exact Farkas exclusion or explicitly inconclusive relaxation feasibility |
 | No-input bilocal reconstruction | Arbitrary finite output alphabets on a three-party chain | Exact membership decision and constructive source model |

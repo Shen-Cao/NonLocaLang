@@ -1,8 +1,8 @@
-"""Recompute one specified six-mode reference and compare a supplied target."""
+"""Recompute one named balanced routing strategy and compare a supplied target."""
 from hashlib import sha256
 
 from ..core.identity import canonical_json
-from .fermion_reference import reference_arena, reference_target
+from .fermion_reference import REFERENCE_STATISTICS, reference_arena, reference_target
 from .quadratic import scalar_to_pair
 from .quadratic_behavior import QuadraticWiringTarget
 from .quadratic_wire import target_id
@@ -10,14 +10,20 @@ from .serialization import arena_id
 
 
 def reference_definition(statistics):
-    if statistics not in ("fermionic", "ordinary_tensor"):
-        raise ValueError("Expected fermionic or ordinary_tensor statistics")
-    return {"schema": "nonlocalgames.six_mode_reference.v1",
-            "arena_id": arena_id(reference_arena()), "statistics": statistics,
-            "preparation": "one_balanced_particle_per_origin",
-            "port_basis": "incoming_then_kept", "party_order": ["A", "B", "C"],
-            "outputs": ["0", "1+", "1-", "2"], "measurements": "B.6_B.17_B.18",
-            "source": "arXiv:2606.12363v1"}
+    if statistics not in REFERENCE_STATISTICS:
+        raise ValueError(f"statistics must be one of {REFERENCE_STATISTICS}")
+    definition = {"schema": "nonlocalgames.six_mode_reference.v1",
+                  "arena_id": arena_id(reference_arena()), "statistics": statistics,
+                  "preparation": "one_balanced_particle_per_origin",
+                  "port_basis": "incoming_then_kept", "party_order": ["A", "B", "C"],
+                  "outputs": ["0", "1+", "1-", "2"], "measurements": "B.6_B.17_B.18",
+                  "source": "arXiv:2606.12363v1"}
+    if statistics == "fermionic_even_pair":
+        definition.update(schema="nonlocalgames.even_pair_reference.v1",
+                          preparation="one_balanced_fermion_pair_per_origin",
+                          encoding="0_to_00_and_1_to_11_per_port", modes_per_port=2,
+                          encoding_source="arXiv:2611.25074v1")
+    return definition
 
 
 def compare_reference(target, *, statistics="fermionic"):
@@ -26,7 +32,7 @@ def compare_reference(target, *, statistics="fermionic"):
         raise TypeError("Expected a quadratic wiring target")
     definition = reference_definition(statistics)
     if target.arena != reference_arena():
-        raise ValueError("The six-mode reference requires its specified five routes and question/answer alphabets")
+        raise ValueError("The reference requires its specified five routes and question/answer alphabets")
     expected = reference_target(statistics=statistics)
     mismatches = 0
     first = None

@@ -10,7 +10,7 @@ Scalar = int | Fraction | str
 
 @dataclass(frozen=True, slots=True)
 class Continuation:
-    """Verifier delivers this classical question after the first answer.
+    """Verifier delivers this classical question and the prepared Q2 after the first answer.
 
     accept[z] is an acceptance effect on the verifier's *retained* reference,
     selected after the local final answer z. These effects need not form a POVM.
@@ -21,26 +21,27 @@ class Continuation:
 
 @dataclass(frozen=True, slots=True)
 class PrivateCase:
-    """The index of this private draw is not sent; only question and Q are sent."""
+    """The index of this private draw is not sent; the initial delivery is question and Q1."""
     probability: Scalar
     question: int
-    state: RationalMatrix  # joint density in reference R, transmitted system Q order
+    state: RationalMatrix  # joint density in R_keep ⊗ Q2 ⊗ Q1 order
     after_first: tuple[Continuation, ...]  # indexed by the first classical answer
 
 
 @dataclass(frozen=True, slots=True)
 class TwoRoundProtocol:
-    """Trusted verifier: initial correlated preparation, adaptive question, final test."""
-    reference_dimension: int
-    message_dimension: int
+    """Trusted verifier with one preparation and a fixed time for each wire transfer."""
+    reference_dimension: int  # R_keep, never sent
+    message_dimension: int  # Q1, also the dimension of the retained prover memory M
     cases: tuple[PrivateCase, ...]
+    second_message_dimension: int = 1  # Q2; dimension one is a classical-only follow-up
 
 
 @dataclass(frozen=True, slots=True)
 class KrausTerm:
     """A completely positive summand X -> weight * operator X operator†."""
     weight: Scalar
-    operator: RationalMatrix  # Q to memory, same dimension in this dialect
+    operator: RationalMatrix  # Q1 to M, same dimension in this dialect
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,7 +63,7 @@ class LocalHistory:
 class FinalMove:
     """One final POVM for all branches with this delivered local history."""
     history: LocalHistory
-    effects: tuple[RationalMatrix, ...]  # POVM on the local conditioned memory
+    effects: tuple[RationalMatrix, ...]  # POVM on Q2 ⊗ M (just M when Q2 is trivial)
 
 
 @dataclass(frozen=True, slots=True)

@@ -15,6 +15,8 @@ The [theoretical report](report/main.tex) develops the representation and proof
 contracts. A [bounded two-round replay](docs/interactive-replay.md) checks one supplied
 strategy with a trusted quantum question and an adaptive classical follow-up.
 The verifier can deliver a second prepared quantum register with that follow-up.
+An optional [typed event program](docs/protocol-events.md) checks which registers
+are available at each move before running the same replay.
 General sequential protocols and general network optimization remain research extensions.
 
 ## Quick start

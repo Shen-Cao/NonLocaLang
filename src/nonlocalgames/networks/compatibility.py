@@ -158,4 +158,4 @@ def validate_triangle(network):
     edges = {frozenset(edge) for edge in network.sources}
     if network.parties != 3 or len(network.sources) != 3 or edges != {
             frozenset((0, 1)), frozenset((1, 2)), frozenset((0, 2))}:
-        raise ValueError("Triangle Finner requires exactly one independent source on each party pair")
+        raise ValueError("Triangle requires exactly one independent source on each party pair")

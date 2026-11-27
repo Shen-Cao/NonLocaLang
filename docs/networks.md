@@ -85,6 +85,9 @@ print(evidence.I, evidence.J, evidence.value)  # approximately 1/2, 1/2, sqrt(2)
 assert evidence.guarantee == "numerical_witness"
 ```
 
+See the [static RGB4 triangle](rgb4.md) for a fixed, exactly contracted quantum
+example and an explicit source-dephased classical control with the same token counts.
+
 ## Bilocality inequality
 
 The bilocal witness has inputs `(2, 1, 2)` and outputs `(2, 4, 2)`. Bob's output

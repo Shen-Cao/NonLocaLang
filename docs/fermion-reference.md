@@ -11,10 +11,11 @@ python -m nonlocalgames fermion-reference target > output/fermion/target.json
 python -m nonlocalgames fermion-reference check output/fermion/target.json
 python -m nonlocalgames fermion-reference check output/fermion/target.json --statistics ordinary_tensor
 python -m nonlocalgames fermion-reference check output/fermion/target.json --statistics fermionic_even_pair
+python -m nonlocalgames fermion-reference score output/fermion/target.json
 ```
 
-The default compares the data with the specified single-mode fermionic
-preparation, route action and measurements. The other two commands compare
+The default `check` compares the data with the specified single-mode fermionic
+preparation, route action and measurements. The two `--statistics` checks compare
 it with a zero-phase ordinary tensor strategy and its even-packet fermionic
 encoding. Each receipt records both target IDs, the reference ID, the number of
 entries compared, and the first disagreement when one exists. A completed
@@ -23,6 +24,8 @@ Check that JSON field to tell whether the target matched. A mismatch
 answers the question about that reference. Exclusion of every allowed qubit
 strategy in the paper uses cross-wiring rigidity (Theorem B.3); these
 comparisons do not establish that theorem or self-test any device.
+The separate `score` command evaluates [one linear statistic](#five-route-raw-score);
+it does not replace a comparison of the full table.
 
 ## Conventions
 
@@ -114,7 +117,112 @@ keys matters: if a party were told the route, an ordinary tensor strategy
 could reproduce even the single-mode table by flipping only B in AB, C in
 AC and B in BC at that party's question 1. These are not allowed local keys.
 
-### Applying a graded permutation to other occupation states
+## Five-route raw score
+
+Give the four answer labels `0,1+,1-,2` signed values `0,+1,-1,0`.
+For each route and question, take the expectation of the **product** of the
+signed values at the sites on the moving cycle. Sum over **every** answer of
+the idle site, if any. These are raw expectations in the original table:
+never divide by the observed probability of a token sector. The contrasts are:
+
+| Route | Active sites | Questions (A,B,C) | Weight on each expectation |
+|---|---|---|---|
+| ABC, ACB | A,B,C | (0,1,1) and (1,1,1) | 2√2 |
+| AB | A,B | (0,1,0) and (1,1,0) | √2 |
+| AC | A,C | (0,0,1) and (1,0,1) | √2 |
+| BC | B,C | (0,1,1) only | 2 |
+
+Set `S = (ABC + ACB − AB − AC − BC)/5`. It is a signed score, **not** a
+winning probability. The Python API and CLI both require the exact reference
+arena. The CLI checks the arena before decoding the exact probabilities,
+then validates every branch, including unscored rows. Reports bind the five
+contrasts and their score to the target's content ID;
+their `[a,b]` pairs still mean `a+b√2`. By default the CLI admits at most
+8,000,000 input bytes and uses a 4,096-bit coefficient budget
+(`--max-file-bytes`, `--max-scalar-bits`).
+
+```python
+from fractions import Fraction
+from nonlocalgames.protocols.fermion_reference import ReadoutContext, balanced_strategy_target
+from nonlocalgames.protocols.five_route_score import five_route_score
+
+assert five_route_score(balanced_strategy_target()).score == 1
+swaps = [ReadoutContext(receiver=i, incoming_sender=j, question=x)
+         for i, j, x in [(0, 2, 0), (0, 2, 1), (1, 0, 1)]]
+s = five_route_score(balanced_strategy_target(statistics="ordinary_tensor", swap_sign_labels=swaps))
+assert (s.abc, s.acb, s.ab, s.ac, s.bc) == (1, 1, -1, -1, 1)
+assert s.score == Fraction(3, 5)
+```
+
+The ideal single modes give `(+1,+1,−1,−1,−1)`. The balanced zero-phase
+ordinary tensor and even-packet references both give five +1s (`S = −1/5`).
+The displayed calibration attains `3/5` for either control, missing only BC.
+The two upper bounds below apply **only to their respective families**.
+A score below a bound is not a compatibility witness, and neither comparison
+is a general classical/ordinary-tensor/even-fermion bound, a self-test, or a
+finite-sample statistical test.
+
+### Why the fixed local sign-swap bound is 3/5
+
+Keep the reference sources and projectors fixed in the ordinary or even-packet
+control, allowing only the local swaps above, shared across routes. Write
+`u_ij` for the sign at receiver `i` with incoming sender `j`: use question
+1 for B,C and the **mean** of Alice's two signs for A. In order ABC, ACB,
+AB, AC, BC the contrasts are the five products
+
+```text
+u_AC u_BA u_CB,  u_AB u_BC u_CA,  u_AB u_BA,  u_AC u_CA,  u_BC u_CB.
+```
+
+Unequal signs at an Alice/sender pair give mean zero, erasing both contrasts
+that contain it. At most three unit terms remain. Otherwise each directed
+sign appears twice across the products, so their product is +1. The target
+signs have product −1: at least one term must miss, giving `S ≤ 3/5`.
+
+### A separate phase-family bound
+
+For this comparison each ordinary/even-encoded source may be **any independent
+state on its two logical one-token alternatives** (kept only or sent only).
+There are no auxiliary systems. The hidden passive routing and token-sector
+projectors are fixed. Within the one-token sector, retain Alice's
+`(Xφ + (−1)^x Z)/√2` shape and B,C's `Z` or `Xφ`; the equatorial phase
+of `Xφ = cos(φ)X + sin(φ)Y` and the sign-label swap may depend on the
+receiver, incoming sender and question, but not independently on the route.
+
+Each contrast is the real part of the same cycle product listed above, now
+with complex factors of modulus at most one. To see why, a non-Alice X
+readout flips the occupied port. In a moving cycle this forces a switch of
+**every** source between the all-kept and all-sent paths; the reverse term
+is its conjugate. The idle source is traced out. The fixed weights leave
+one factor `2ρ_j(kept,sent)` per source (modulus at most one by positivity).
+For `u_ij` multiply that factor by the signed equatorial phase at receiver
+`i`, averaged over Alice's two settings when applicable. Diagonal Z terms
+do not contribute.
+
+The real sum is linear in each directed factor separately, so its maximum
+over the six unit disks is attained on their circles. The two triangle
+phase angles sum to the three pair angles modulo 2π. Use the triangle angles
+and **π minus** each pair angle as five angles: their sum is π modulo 2π,
+and `5S` is the sum of their cosines. If a cosine is nonpositive, the sum
+is at most 4. Otherwise their principal angles lie in (−π/2,π/2) and total
+±π; concavity of cosine there gives a sum at most `5 cos(π/5) > 4`.
+Equality is possible with balanced sources and all directed phases 3π/5.
+Thus the sharp cap **in this larger family** is
+`cos(π/5) = (1 + √5)/4`. A common source phase with cosine −1/3 already
+gives `109/135 > 3/5` with unchanged readouts.
+
+The phase cap is not a `Q(√2)` wire scalar. The report gives its expression
+separately; it tests `S > 0` and `4S² − 2S − 1 > 0` exactly, not a rounded
+decimal. The scorer evaluates supplied tables; it does not synthesize
+arbitrary phase strategies.
+
+**A particular dephasing check.** Starting instead from the balanced
+*single-mode fermionic* reference, multiply each independent source's two
+off-diagonal entries by the same real `q ∈ [0,1]`, with populations and
+readouts unchanged. An n-cycle then carries `q^n` times its ideal contrast,
+giving `S = (2q³ + 3q²)/5`. This is not a general visibility or noise bound.
+
+## Applying a graded permutation to other occupation states
 
 Use `ModePermutation` when the relabeling is source-to-destination, or
 `relay_mode_permutation` for a sender-at-each-receiver route. An occupation

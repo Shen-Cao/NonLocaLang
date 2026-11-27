@@ -12,8 +12,10 @@ from math import prod
 
 import pytest
 
-from nonlocalgames.protocols.fermion_reference import reference_target
+from nonlocalgames.protocols.fermion_reference import reference_arena, reference_target
+from nonlocalgames.protocols.five_route_score import five_route_score
 from nonlocalgames.protocols.quadratic import Quadratic
+from nonlocalgames.protocols.quadratic_behavior import QuadraticBehavior, QuadraticWiringTarget
 
 
 # These lists follow the physical directed arrows, not a permutation API.
@@ -35,7 +37,7 @@ def _one_token(party, question, answer):
 
 
 @cache
-def _loop_probability(cycle, questions, answers, graded):
+def _loop_probability(cycle, questions, answers, graded, real_coherence=1):
     counts = tuple((0, 1, 1, 2)[a] for a in answers)
     one = {j: _one_token(p, x, a) for j, (p, x, a) in
            enumerate(zip(cycle, questions, answers)) if counts[j] == 1}
@@ -47,7 +49,7 @@ def _loop_probability(cycle, questions, answers, graded):
     if all(n == 1 for n in counts):
         # Replacing one coherent path by the other cycles all particles once.
         relative_phase = (-1)**(len(cycle)-1) if graded else 1
-        total += 2 * relative_phase * prod(entries[2] for entries in one.values())
+        total += 2 * relative_phase * real_coherence * prod(entries[2] for entries in one.values())
     return total / 2**len(cycle)
 
 
@@ -64,3 +66,31 @@ def test_all_2560_cells_match_exact_analytical_cycle_oracle(statistics, graded):
             assert expected == actual, (route, x, a)
             checked += 1
     assert checked == 2560
+
+
+@pytest.mark.parametrize("graded", [False, True])
+def test_full_phase_or_attenuation_tables_replay_their_scoped_scores(graded):
+    if graded:
+        # Independent single-mode sources: attenuate only each off-diagonal by q.
+        q = Fraction(1, 2)
+        by_length = {n: q**n for n in (1, 2, 3)}
+        expected = (2*q**3 + 3*q**2)/5
+    else:
+        # A balanced ordinary source phase with cos(phi)=-1/3. The complete
+        # tables stay in Q(sqrt(2)) because all detector matrices are real.
+        c = Fraction(-1, 3)
+        by_length = {1: c, 2: 2*c*c-1, 3: 4*c**3-3*c}
+        expected = Fraction(109, 135)  # exceeds 3/5, below (1+sqrt(5))/4
+    arena = reference_arena()
+    branches = {}
+    for route, loops in LOOPS.items():
+        events = product(arena.scenario.inputs, arena.scenario.outputs)
+        values = (prod(_loop_probability(cycle, tuple(x[i] for i in cycle),
+                                         tuple(a[i] for i in cycle), graded, by_length[len(cycle)])
+                       for cycle in loops) for x, a in events)
+        branches[route] = QuadraticBehavior(arena.scenario, values)
+    result = five_route_score(QuadraticWiringTarget(arena, branches))
+    assert result.score == expected
+    controls = result.to_dict()["comparisons"]
+    assert controls["fixed_local_sign_swaps"]["exceeds_upper_bound"] == (not graded)
+    assert not controls["one_token_equatorial_phases"]["exceeds_upper_bound"]

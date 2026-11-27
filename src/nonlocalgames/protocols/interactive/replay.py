@@ -10,7 +10,7 @@ from ._plan import prepare
 from .model import LocalHistory, LocalStrategy, ReplayLimits, ReplayResult, Transcript, TwoRoundProtocol
 
 
-def _check_physics(cases, first, final, ir, iq1, ilocal, b):
+def _check_physics(cases, first, final, ir, iq1, ilocal, b, *, keep_outcome_effects=False):
     for _, case in cases:
         if case.state.trace(budget=b) != (1, 0):
             raise ValueError("Verifier's joint preparation must have trace one")
@@ -21,14 +21,27 @@ def _check_physics(cases, first, final, ir, iq1, ilocal, b):
                 verify_psd_complex(subtract(ir, effect, budget=b), budget=b)
 
     zero = scale(iq1, 0, budget=b)
-    for outcomes in first.values():
+    # When the register never leaves Alice and has no later use, retain each
+    # outcome's adjoint-on-identity effect rather than evolving the joint state.
+    by_question = {} if keep_outcome_effects else None
+    for question, outcomes in first.items():
         total = zero
+        row = []
         for terms in outcomes:
+            # Preserve the original running-sum order for the one-prover checker.
+            acc = zero if keep_outcome_effects else total
             for w, k in terms:
-                gram = multiply(adjoint(k, budget=b), k, budget=b)
-                total = add(total, scale(gram, w, budget=b), budget=b)
+                gram = scale(multiply(adjoint(k, budget=b), k, budget=b), w, budget=b)
+                acc = add(acc, gram, budget=b)
+            if keep_outcome_effects:
+                row.append(acc)
+                total = add(total, acc, budget=b)
+            else:
+                total = acc
         if total != iq1:
             raise ValueError("First instrument must be trace preserving when summed over outcomes")
+        if keep_outcome_effects:
+            by_question[question] = tuple(row)
     if ilocal is not iq1:
         zero = scale(ilocal, 0, budget=b)
     for effects in final.values():
@@ -38,6 +51,7 @@ def _check_physics(cases, first, final, ir, iq1, ilocal, b):
             total = add(total, effect, budget=b)
         if total != ilocal:
             raise ValueError("Final POVM effects must sum to identity")
+    return by_question
 
 
 def _branch(state, terms, i_untouched, zero, b):

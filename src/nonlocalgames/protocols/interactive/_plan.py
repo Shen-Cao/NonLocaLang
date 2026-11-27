@@ -5,8 +5,8 @@ from ...quantum.exact import ExactBudgetExceeded, RationalMatrix
 from ...quantum.exact.budgets import bounded_dimension
 from ...quantum.exact.scalars import exact_scalar
 from .model import (
-    Continuation, FinalMove, FirstMove, KrausTerm, LocalHistory, LocalStrategy,
-    PrivateCase, ReplayLimits, TwoRoundProtocol,
+    BobMove, Continuation, FinalMove, FirstMove, KrausTerm, LocalHistory, LocalStrategy,
+    PrivateCase, ReplayLimits, TwoProverProtocol, TwoProverStrategy, TwoRoundProtocol,
 )
 
 
@@ -52,20 +52,35 @@ class _Meter:
 def prepare(protocol, strategy, limits):
     if not isinstance(protocol, TwoRoundProtocol) or not isinstance(strategy, LocalStrategy):
         raise TypeError("Expected TwoRoundProtocol and LocalStrategy")
+    return _prepare(protocol.reference_dimension, protocol.second_message_dimension,
+                    protocol.message_dimension, protocol.cases, strategy.first, strategy.final,
+                    limits, separate_provers=False)
+
+
+def prepare_two_prover(protocol, strategy, limits):
+    if not isinstance(protocol, TwoProverProtocol) or not isinstance(strategy, TwoProverStrategy):
+        raise TypeError("Expected TwoProverProtocol and TwoProverStrategy")
+    return _prepare(protocol.reference_dimension, protocol.bob_dimension, protocol.alice_dimension,
+                    protocol.cases, strategy.alice, strategy.bob, limits, separate_provers=True)
+
+
+def _prepare(r, q2, q1, private_cases, first_moves, final_moves, limits, *, separate_provers):
     if not isinstance(limits, ReplayLimits):
         raise TypeError("Expected ReplayLimits")
     b = limits.exact
-    r = bounded_dimension(protocol.reference_dimension, b)
-    q1 = bounded_dimension(protocol.message_dimension, b)
-    q2 = bounded_dimension(protocol.second_message_dimension, b)
-    local = q2*q1  # final measurement acts on Q2 ⊗ M
-    d = bounded_dimension(r*local, b)
+    if separate_provers:
+        _bounded(2, b.max_parties, "max_parties")
+    r = bounded_dimension(r, b)
+    q1 = bounded_dimension(q1, b)
+    q2 = bounded_dimension(q2, b)
+    local = q2 if separate_provers else q2*q1  # Bob owns only Q_B, never Alice's register.
+    d = bounded_dimension(r*q2*q1, b)
     # The preparation is the largest PSD input; reference and final effects fit too.
     _bounded(2*d, b.max_psd_size, "max_psd_size")
     meter = _Meter(limits)
     first, final, cases = {}, {}, []
     groups = nterms = nfinal = 0
-    for move in _table(strategy.first, b.max_events, "first moves"):
+    for move in _table(first_moves, b.max_events, "first moves"):
         if not isinstance(move, FirstMove):
             raise TypeError("Expected FirstMove")
         x = _label(move.question)
@@ -74,6 +89,8 @@ def prepare(protocol, strategy, limits):
         outcomes = _table(move.outcomes, b.max_events, "instrument outcomes")
         groups += len(outcomes)
         _bounded(groups, b.max_events, "instrument outcomes")
+        if separate_provers:
+            meter.charge(len(outcomes)*q1*q1)  # aggregate the saved Alice outcome effects
         resolved = []
         for group in outcomes:
             terms = []
@@ -90,26 +107,33 @@ def prepare(protocol, strategy, limits):
                 terms.append((w, term.operator))
             resolved.append(tuple(terms))
         first[x] = tuple(resolved)
-    for move in _table(strategy.final, b.max_events, "final moves"):
-        if not isinstance(move, FinalMove) or not isinstance(move.history, LocalHistory):
-            raise TypeError("Expected FinalMove with LocalHistory")
-        h = move.history
-        for label in (h.first_question, h.first_answer, h.second_question):
-            _label(label)
-        if h in final:
-            raise ValueError("Duplicate final history in local strategy")
+    for move in _table(final_moves, b.max_events, "final moves"):
+        if separate_provers:
+            if not isinstance(move, BobMove):
+                raise TypeError("Expected BobMove with only Bob's question")
+            key = _label(move.question)
+            if key in final:
+                raise ValueError("Duplicate Bob question in local strategy")
+        else:
+            if not isinstance(move, FinalMove) or not isinstance(move.history, LocalHistory):
+                raise TypeError("Expected FinalMove with LocalHistory")
+            key = move.history
+            for label in (key.first_question, key.first_answer, key.second_question):
+                _label(label)
+            if key in final:
+                raise ValueError("Duplicate final history in local strategy")
         effects = _table(move.effects, b.max_events, "final POVM")
         nfinal += len(effects)
         _bounded(nfinal, b.max_events, "final POVM outcomes")
         for effect in effects:
             meter.matrix(effect, local)
             meter.charge((2*local)**3 + local*local)  # realified PSD and completeness
-        final[h] = effects
+        final[key] = effects
 
     used_first, used_final = set(), set()
     leaves = 0
     mass = Fraction(0)
-    for case in _table(protocol.cases, b.max_events, "private cases"):
+    for case in _table(private_cases, b.max_events, "private cases"):
         if not isinstance(case, PrivateCase):
             raise TypeError("Expected PrivateCase")
         p = exact_scalar(case.probability, max_bits=b.max_scalar_bits)
@@ -126,14 +150,18 @@ def prepare(protocol, strategy, limits):
         for y, cont in enumerate(follow):
             if not isinstance(cont, Continuation):
                 raise TypeError("Expected Continuation")
-            h = LocalHistory(x, y, _label(cont.question))
+            v = _label(cont.question)
+            key = v if separate_provers else LocalHistory(x, y, v)
             tests = _table(cont.accept, b.max_events, "verifier acceptance effects")
-            if h not in final or len(tests) != len(final[h]):
+            if key not in final or len(tests) != len(final[key]):
                 raise ValueError("Missing final move or inconsistent final-answer alphabet")
-            used_final.add(h)
+            used_final.add(key)
             leaves += len(tests)
             _bounded(leaves, b.max_events, "transcript leaves")
-            meter.charge(len(first[x][y])*(2*d**3 + 4*d*d) + d*d)
+            if separate_provers:
+                meter.charge(len(tests)*(q2*q1)**2)  # B[v,z] ⊗ A[x,y], once per leaf
+            else:
+                meter.charge(len(first[x][y])*(2*d**3 + 4*d*d) + d*d)
             for test in tests:
                 meter.matrix(test, r)
                 meter.charge(2*(2*r)**3 + 4*d*d + r*r)  # 0 <= E <= I; two Born traces

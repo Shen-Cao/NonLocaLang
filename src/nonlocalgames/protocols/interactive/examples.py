@@ -4,8 +4,8 @@ from fractions import Fraction
 from ...quantum.exact import RationalMatrix
 from ...quantum.exact.algebra import identity, scale
 from .model import (
-    Continuation, FinalMove, FirstMove, KrausTerm, LocalHistory, LocalStrategy,
-    PrivateCase, TwoRoundProtocol,
+    BobMove, Continuation, FinalMove, FirstMove, KrausTerm, LocalHistory, LocalStrategy,
+    PrivateCase, TwoProverProtocol, TwoProverStrategy, TwoRoundProtocol,
 )
 
 
@@ -113,3 +113,23 @@ def split_bell_label(memory="retain", *, independent=False):
     protocol = TwoRoundProtocol(1, 2, cases, second_message_dimension=2)
     ack = FirstMove(0, (tuple(KrausTerm(1, op) for op in operators),))
     return protocol, LocalStrategy((ack,), (FinalMove(LocalHistory(0, 0, 0), bells),))
+
+
+def two_prover_bit_relay(*, forward_answer=False):
+    """With the same local play, Bob receives either an independent fair coin or Alice's reply."""
+    if type(forward_answer) is not bool:
+        raise TypeError("forward_answer must be a boolean")
+    unit = identity(1)
+    alice = tuple(FirstMove(x, tuple((KrausTerm(1, unit),) if y == x else ()
+                                     for y in range(2))) for x in range(2))
+    bob = tuple(BobMove(v, _output_label(v, 1)) for v in range(2))
+    cases = []
+    for x in range(2):
+        for coin in range(2):
+            # Only the verifier knows the full draw (x, coin). It scores z against x.
+            follow = tuple(Continuation(y if forward_answer else coin, _output_label(x, 1))
+                           for y in range(2))
+            cases.append(PrivateCase(Fraction(1, 4), x, unit, follow))
+    protocol = TwoProverProtocol(reference_dimension=1, alice_dimension=1, bob_dimension=1,
+                                 cases=tuple(cases))
+    return protocol, TwoProverStrategy(alice, bob)

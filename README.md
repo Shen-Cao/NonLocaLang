@@ -17,6 +17,9 @@ strategy with a trusted quantum question and an adaptive classical follow-up.
 The verifier can deliver a second prepared quantum register with that follow-up.
 General sequential protocols and general network optimization remain research extensions.
 
+In [Alice-then-Bob replay](docs/two-prover-replay.md), only Bob's delivered
+question selects his measurement, even when the verifier chose it from Alice's reply.
+
 ## Quick start
 
 Use Python 3.11 or newer in an environment of your choice:

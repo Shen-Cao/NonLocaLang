@@ -165,3 +165,6 @@ independent multi-prover dispatch, undeclared persistent quantum memory or
 advice, adaptive quantum preparation, intermediate verifier gates,
 circuit-depth/light-cone checks, general comb optimizer, or full interactive
 proof theorem. It is not a translation into the single-round `Game` type.
+Use the distinct [Alice-then-Bob dialect](two-prover-replay.md) when only the
+second prover's delivered question may select its POVM and it cannot access
+the first prover's output register.

@@ -110,6 +110,10 @@ analysis only. No probabilities are postselected or divided by a branch trace.
   prior 1/4 and using Σ_z F_z = I₄ gives success ≤ 1/2. Replay itself checks only the examples'
   supplied instruments and POVMs; it does not optimize over classical memory.
 
+  The [noisy-memory comparison](noisy-bell-memory.md) shows two channels with
+  identical Bell transcripts that differ under a stored-wire Z readout, then
+  two conjugate channels that agree on both readouts but differ on phase parity.
+
 ## Checked inputs, budgets, and trust boundary
 
 Use the types exported from `nonlocalgames.protocols.interactive` and

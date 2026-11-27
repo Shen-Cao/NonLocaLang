@@ -5,6 +5,9 @@ supplied strategy** for a trusted verifier. It returns an exact acceptance
 probability and every transcript leaf, including impossible leaves. It does not
 optimize, issue a general upper bound, or add a claim to the proof ledger.
 
+The [adaptive Pauli-frame example](adaptive-pauli-frame.md) follows the individual
+leaves of a Bell measurement and a later basis question.
+
 ```python
 from fractions import Fraction
 from nonlocalgames.protocols.interactive import replay

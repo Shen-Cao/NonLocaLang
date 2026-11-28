@@ -1,5 +1,6 @@
 """Exact supplied-strategy point evaluation; the private verifier is not a player."""
 from fractions import Fraction
+from typing import overload
 
 from ...quantum.exact import verify_psd_complex
 from ...quantum.exact.algebra import (
@@ -7,6 +8,7 @@ from ...quantum.exact.algebra import (
 )
 from ...quantum.exact.scalars import exact_scalar
 from ._plan import prepare
+from .events import TwoRoundProgram
 from .model import LocalHistory, LocalStrategy, ReplayLimits, ReplayResult, Transcript, TwoRoundProtocol
 
 
@@ -73,15 +75,29 @@ def _mass(prior, state, verifier_effect, local_effect, b):
     return exact_scalar(prior * real, max_bits=b.max_scalar_bits)
 
 
+@overload
 def replay(protocol: TwoRoundProtocol, strategy: LocalStrategy, *,
+           limits: ReplayLimits = ...) -> ReplayResult: ...
+
+
+@overload
+def replay(protocol: TwoRoundProgram, *, limits: ReplayLimits = ...) -> ReplayResult: ...
+
+
+def replay(protocol: TwoRoundProtocol | TwoRoundProgram, strategy: LocalStrategy | None = None, *,
            limits: ReplayLimits = ReplayLimits()) -> ReplayResult:
     """Check all declared data, then enumerate all leaves including zero-mass leaves.
 
+    An event program lowers to the same verifier/strategy pair before preflight.
     No strategy callback runs. A delivered classical question selects the first
     instrument; only LocalHistory selects the final POVM. The unnormalized maps
     act only on Q1, preserving correlations with the later wire Q2 and the
     verifier reference. The final POVM acts on Q2 ⊗ M, never on the reference.
     """
+    if type(protocol) is TwoRoundProgram:
+        if strategy is not None:
+            raise TypeError("A TwoRoundProgram already supplies both local move tables")
+        protocol, strategy = protocol.lower()
     (r, q2, q1), cases, first, final = prepare(protocol, strategy, limits)
     b = limits.exact
     ir, iq1 = identity(r, budget=b), identity(q1, budget=b)

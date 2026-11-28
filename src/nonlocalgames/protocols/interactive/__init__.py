@@ -1,4 +1,5 @@
 """Finite two-round replay with quantum messages and classical local histories."""
+from .events import TwoRoundProgram
 from .model import (
     BobMove, Continuation, FinalMove, FirstMove, KrausTerm, LocalHistory, LocalStrategy,
     PrivateCase, ReplayLimits, ReplayResult, Transcript, TwoProverProtocol, TwoProverResult,
@@ -11,5 +12,6 @@ __all__ = [
     "BobMove", "TwoProverProtocol", "TwoProverResult", "TwoProverStrategy",
     "TwoProverTranscript", "replay_two_prover",
     "Continuation", "FinalMove", "FirstMove", "KrausTerm", "LocalHistory", "LocalStrategy",
-    "PrivateCase", "ReplayLimits", "ReplayResult", "Transcript", "TwoRoundProtocol", "replay",
+    "PrivateCase", "ReplayLimits", "ReplayResult", "Transcript", "TwoRoundProgram",
+    "TwoRoundProtocol", "replay",
 ]

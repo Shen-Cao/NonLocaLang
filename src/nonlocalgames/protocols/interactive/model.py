@@ -1,4 +1,4 @@
-"""Data for a finite verifier, one local strategy, and their exact transcript."""
+"""Data for finite trusted-verifier replay with one or two explicitly owned local tables."""
 from dataclasses import dataclass
 from fractions import Fraction
 
@@ -106,3 +106,49 @@ class ReplayResult:
     """Exact acceptance probability of this one supplied strategy (not an optimum)."""
     acceptance_probability: Fraction
     transcripts: tuple[Transcript, ...]
+
+
+@dataclass(frozen=True, slots=True, kw_only=True)
+class TwoProverProtocol:
+    """Alice then Bob. Each case prepares R_keep ⊗ Q_B ⊗ Q_A before either delivery.
+
+    The case sends x and Q_A to Alice; after Alice's y, its continuation sends
+    v and Q_B to Bob. Only the verifier tests its retained R_keep after Bob's z.
+    """
+    reference_dimension: int
+    alice_dimension: int
+    bob_dimension: int
+    cases: tuple[PrivateCase, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class BobMove:
+    """A POVM on Q_B keyed only by Bob's delivered classical question v."""
+    question: int
+    effects: tuple[RationalMatrix, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TwoProverStrategy:
+    """Separate response tables; no private preshared resources or inter-prover wire."""
+    alice: tuple[FirstMove, ...]
+    bob: tuple[BobMove, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TwoProverTranscript:
+    """Full verifier-side leaf, not a view available to either prover."""
+    private_case: int
+    alice_question: int
+    alice_answer: int
+    bob_question: int
+    bob_answer: int
+    probability: Fraction
+    accepted_mass: Fraction
+
+
+@dataclass(frozen=True, slots=True)
+class TwoProverResult:
+    """Exact score and unconditional transcripts for this one strategy."""
+    acceptance_probability: Fraction
+    transcripts: tuple[TwoProverTranscript, ...]
